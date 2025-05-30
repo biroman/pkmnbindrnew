@@ -2,6 +2,18 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import Card from "../ui/Card";
 import Button from "../ui/Button";
+import {
+  Plus,
+  Library,
+  Search,
+  BarChart3,
+  Star,
+  Gem,
+  TrendingUp,
+  Target,
+  Backpack,
+  Package,
+} from "lucide-react";
 
 const WelcomeDashboard = () => {
   const { currentUser, userProfile } = useAuth();
@@ -136,7 +148,7 @@ const WelcomeDashboard = () => {
                   variant="primary"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">📱</span>
+                  <Plus className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Add Cards
                 </Button>
               </Link>
@@ -146,7 +158,7 @@ const WelcomeDashboard = () => {
                   variant="secondary"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">📚</span>
+                  <Library className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   View Collection
                 </Button>
               </Link>
@@ -156,7 +168,7 @@ const WelcomeDashboard = () => {
                   variant="outline"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">🔍</span>
+                  <Search className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Search Cards
                 </Button>
               </Link>
@@ -166,7 +178,7 @@ const WelcomeDashboard = () => {
                   variant="outline"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">📊</span>
+                  <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Statistics
                 </Button>
               </Link>
@@ -176,7 +188,7 @@ const WelcomeDashboard = () => {
                   variant="outline"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">⭐</span>
+                  <Star className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Favorites
                 </Button>
               </Link>
@@ -186,7 +198,7 @@ const WelcomeDashboard = () => {
                   variant="outline"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">💎</span>
+                  <Gem className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Rare Cards
                 </Button>
               </Link>
@@ -196,7 +208,7 @@ const WelcomeDashboard = () => {
                   variant="outline"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">📈</span>
+                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Price Tracker
                 </Button>
               </Link>
@@ -206,7 +218,7 @@ const WelcomeDashboard = () => {
                   variant="outline"
                   className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
                 >
-                  <span className="text-lg sm:text-2xl mb-1">🎯</span>
+                  <Target className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
                   Wishlist
                 </Button>
               </Link>
@@ -221,7 +233,7 @@ const WelcomeDashboard = () => {
               Recent Activity
             </h2>
             <div className="text-center py-4 sm:py-8">
-              <div className="text-4xl sm:text-6xl mb-4">🎒</div>
+              <Backpack className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
               {totalCards === 0 ? (
                 <div className="space-y-4">
                   <p className="text-sm sm:text-lg text-gray-500 dark:text-gray-400">

@@ -1,17 +1,18 @@
 import { useAuth } from "../contexts/AuthContext";
+import { User } from "lucide-react";
 
 const Profile = () => {
   const { currentUser, userProfile } = useAuth();
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Profile & Settings
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            Profile Settings
           </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Manage your account settings and preferences
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            Manage your account settings and collection preferences
           </p>
         </div>
 
@@ -93,12 +94,13 @@ const Profile = () => {
 
         {/* Settings will be added later */}
         <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-          <div className="text-6xl mb-4">⚙️</div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Settings Panel Coming Soon
+          <User className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Profile Management Coming Soon
           </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Customize your preferences, theme, currency, and privacy settings.
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            Edit your profile information, collection preferences, and privacy
+            settings.
           </p>
         </div>
       </div>

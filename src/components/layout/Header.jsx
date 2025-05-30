@@ -1,18 +1,55 @@
 import { useAuth } from "../../contexts/AuthContext";
 import ThemeToggle from "../ui/ThemeToggle";
 import Button from "../ui/Button";
-import { Menu, X, LogOut } from "lucide-react";
+import {
+  Menu,
+  X,
+  LogOut,
+  ShieldCheck,
+  Settings,
+  ChevronDown,
+  User,
+} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
   const { currentUser, userProfile, logout, loading } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await logout();
+      setIsDropdownOpen(false);
     } catch (error) {
       console.error("Failed to log out:", error);
     }
   };
+
+  const handleSettingsClick = () => {
+    setIsDropdownOpen(false);
+    navigate("/profile");
+  };
+
+  const toggleDropdown = () => {
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const displayName =
     userProfile?.displayName || currentUser?.displayName || "User";
@@ -20,50 +57,64 @@ const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
   const photoURL = userProfile?.photoURL || currentUser?.photoURL;
 
   return (
-    <header className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Left side - Mobile hamburger + Logo */}
-          <div className="flex items-center">
-            {/* Mobile hamburger menu */}
-            <button
-              onClick={onToggleMobileSidebar}
-              className="lg:hidden p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              aria-label="Toggle mobile menu"
-            >
-              {isMobileSidebarOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
+    <header className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 relative z-30">
+      <div className="w-full flex justify-between items-center h-16">
+        {/* Left side - Logo + Title aligned with sidebar */}
+        <div className="flex items-center">
+          {/* Mobile hamburger menu - only visible on mobile */}
+          <button
+            onClick={onToggleMobileSidebar}
+            className="lg:hidden ml-4 mr-2 p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Toggle mobile menu"
+          >
+            {isMobileSidebarOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
 
-            {/* Logo */}
-            <h1 className="ml-2 lg:ml-0 text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
+          {/* Desktop: Logo + Title positioned to align with sidebar content */}
+          <div className="hidden lg:flex items-center ml-5">
+            {/* Placeholder Logo */}
+            <div className="flex-shrink-0 mr-3">
+              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+            </div>
+            {/* Title */}
+            <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
               Pokemon Binder
             </h1>
           </div>
 
-          {/* Right side - Theme toggle + User section */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <ThemeToggle size="sm" />
+          {/* Mobile: Logo + Title with different positioning */}
+          <div className="flex lg:hidden items-center">
+            {/* Placeholder Logo */}
+            <div className="flex-shrink-0 mr-3">
+              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+            </div>
+            {/* Title */}
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              Pokemon Binder
+            </h1>
+          </div>
+        </div>
 
-            {currentUser && !loading && (
-              <div className="flex items-center space-x-3">
-                {/* User info - hidden on very small screens */}
-                <div className="hidden sm:block text-right">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {displayName}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {email}
-                  </p>
-                  {userProfile && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {userProfile.totalCards} cards
-                    </p>
-                  )}
-                </div>
+        {/* Right side - Theme toggle + User Profile Dropdown */}
+        <div className="flex items-center space-x-2 sm:space-x-4 px-4 sm:px-6 lg:px-8">
+          <ThemeToggle size="sm" />
+
+          {currentUser && !loading && (
+            <div className="relative" ref={dropdownRef}>
+              {/* Profile Button */}
+              <button
+                onClick={toggleDropdown}
+                className="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="User menu"
+              >
+                {/* Username - hidden on very small screens */}
+                <span className="hidden sm:block text-sm font-medium text-gray-900 dark:text-white">
+                  {displayName}
+                </span>
 
                 {/* Profile image/avatar */}
                 {photoURL ? (
@@ -80,36 +131,63 @@ const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
                   </div>
                 )}
 
-                {/* Sign out button - show icon on mobile, text on desktop */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="hidden sm:flex"
-                >
-                  Sign Out
-                </Button>
+                {/* Dropdown indicator - hidden on mobile */}
+                <ChevronDown
+                  className={`hidden sm:block h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform ${
+                    isDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
 
-                {/* Mobile sign out - just icon */}
-                <button
-                  onClick={handleLogout}
-                  className="sm:hidden p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                  aria-label="Sign out"
-                >
-                  <LogOut className="h-5 w-5" />
-                </button>
-              </div>
-            )}
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                  {/* User Info Section */}
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {displayName}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                      {email}
+                    </p>
+                    {userProfile && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {userProfile.totalCards} cards
+                      </p>
+                    )}
+                  </div>
 
-            {loading && (
-              <div className="flex items-center space-x-3">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                  {/* Menu Items */}
+                  <div className="py-1">
+                    <button
+                      onClick={handleSettingsClick}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <Settings className="h-4 w-4 mr-3" />
+                      Settings
+                    </button>
+
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4 mr-3" />
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
-                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+              )}
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex items-center space-x-3">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
               </div>
-            )}
-          </div>
+              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+            </div>
+          )}
         </div>
       </div>
     </header>

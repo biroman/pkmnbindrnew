@@ -5,6 +5,8 @@ import Sidebar from "../navigation/Sidebar";
 
 const AppLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+    useState(false);
 
   const toggleMobileSidebar = () => {
     setIsMobileSidebarOpen(!isMobileSidebarOpen);
@@ -14,29 +16,45 @@ const AppLayout = () => {
     setIsMobileSidebarOpen(false);
   };
 
+  const toggleDesktopSidebar = () => {
+    setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:flex-shrink-0">
-        <div className="flex flex-col w-64">
-          <Sidebar />
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header - spans full width */}
+      <Header
+        onToggleMobileSidebar={toggleMobileSidebar}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+      />
 
-      {/* Main content */}
-      <div className="flex flex-col flex-1 min-w-0">
-        {/* Header */}
-        <Header
-          onToggleMobileSidebar={toggleMobileSidebar}
-          isMobileSidebarOpen={isMobileSidebarOpen}
-        />
-
-        {/* Page content */}
-        <main className="flex-1 relative overflow-hidden">
-          <div className="absolute inset-0 overflow-auto">
-            <Outlet />
+      <div className="flex">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:flex lg:flex-shrink-0">
+          <div
+            className={`flex flex-col transition-all duration-300 ${
+              isDesktopSidebarCollapsed ? "w-16" : "w-64"
+            }`}
+          >
+            <Sidebar
+              isCollapsed={isDesktopSidebarCollapsed}
+              onToggleCollapse={toggleDesktopSidebar}
+            />
           </div>
-        </main>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          {/* Page content */}
+          <main
+            className="relative overflow-hidden"
+            style={{ height: "calc(100vh - 4rem)" }}
+          >
+            <div className="absolute inset-0 overflow-auto">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
 
       {/* Mobile sidebar backdrop - only show when open */}

@@ -14,10 +14,10 @@ import {
   Folder,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useNavigate, useLocation, NavLink } from "react-router-dom";
+import { useNavigate, useLocation, NavLink, Link } from "react-router-dom";
 
 const Header = () => {
-  const { currentUser, userProfile, logout, loading } = useAuth();
+  const { currentUser, userProfile, logout, loading, isOwner } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -106,9 +106,11 @@ const Header = () => {
             <div className="flex-shrink-0 mr-3">
               <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400" />
             </div>
-            <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
-              Pokemon Binder
-            </h1>
+            <Link to="/app/dashboard">
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
+                Pokemon Binder
+              </h1>
+            </Link>
           </div>
         </div>
 
@@ -178,12 +180,23 @@ const Header = () => {
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
                   {/* User Info Section */}
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {displayName}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {email}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {displayName}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                          {email}
+                        </p>
+                      </div>
+                      {isOwner() && (
+                        <div className="ml-2">
+                          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold text-purple-800 bg-purple-100 dark:text-purple-200 dark:bg-purple-900/30 rounded-full">
+                            Owner
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Menu Items */}

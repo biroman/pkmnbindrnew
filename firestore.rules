@@ -2,7 +2,24 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write documents within their own user directory
+    // Helper function to check if user is owner
+    function isOwner() {
+      return request.auth != null && 
+             request.auth.uid != null &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['role']) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner";
+    }
+
+    // Users collection - allow owners to read for admin purposes
+    match /users/{userId} {
+      // Users can read/write their own data
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Owners can read all user documents for admin stats (only read operations)
+      allow read: if request.auth != null && isOwner();
+    }
+
+    // User subcollections - keep private to user only
     match /users/{userId}/{documents=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }

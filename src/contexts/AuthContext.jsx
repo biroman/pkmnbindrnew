@@ -225,6 +225,43 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Role checking functions
+  const getUserRole = () => {
+    return userProfile?.role || "user";
+  };
+
+  const isOwner = () => {
+    return getUserRole() === "owner";
+  };
+
+  const isUser = () => {
+    return getUserRole() === "user";
+  };
+
+  const hasRole = (role) => {
+    return getUserRole() === role;
+  };
+
+  // Check if user has permission for certain actions
+  const canPerformAction = (action) => {
+    const role = getUserRole();
+
+    switch (action) {
+      case "view_admin_panel":
+      case "manage_users":
+      case "system_settings":
+        return role === "owner";
+
+      case "manage_collection":
+      case "add_cards":
+      case "create_wishlist":
+        return role === "owner" || role === "user";
+
+      default:
+        return false;
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -257,6 +294,11 @@ export const AuthProvider = ({ children }) => {
     sendVerificationEmail,
     isEmailVerified,
     refreshUser,
+    getUserRole,
+    isOwner,
+    isUser,
+    hasRole,
+    canPerformAction,
     loading,
   };
 

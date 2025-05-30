@@ -30,8 +30,14 @@ const getUserSubcollection = (userId, subcollection) =>
 export const createUserProfile = async (userId, userData) => {
   try {
     const userDocRef = getUserDocRef(userId);
+
+    // Set role based on email from environment variable
+    const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+    const userRole = userData.email === ownerEmail ? "owner" : "user";
+
     const profileData = {
       ...userData,
+      role: userRole,
       totalCards: 0,
       totalValue: 0,
       createdAt: serverTimestamp(),
@@ -319,6 +325,165 @@ export const getUserActivity = async (userId, limitCount = 10) => {
     return { success: true, data: activities };
   } catch (error) {
     console.error("Error getting user activity:", error);
+    return { success: false, error: getFriendlyErrorMessage(error) };
+  }
+};
+
+// ===== ADMIN OPERATIONS (Owner Only) =====
+
+export const getAdminStats = async () => {
+  try {
+    const startTime = Date.now();
+
+    // Get total user count
+    const usersRef = collection(db, "users");
+    const usersSnapshot = await getDocs(usersRef);
+    const totalUsers = usersSnapshot.size;
+
+    // Get users created in last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentUsersQuery = query(
+      usersRef,
+      where("createdAt", ">=", thirtyDaysAgo)
+    );
+    const recentUsersSnapshot = await getDocs(recentUsersQuery);
+    const newUsersThisMonth = recentUsersSnapshot.size;
+
+    // Calculate total cards across all users
+    let totalCardsAcrossUsers = 0;
+    let totalValueAcrossUsers = 0;
+    let usersWithData = 0;
+
+    usersSnapshot.docs.forEach((doc) => {
+      const userData = doc.data();
+      totalCardsAcrossUsers += userData.totalCards || 0;
+      totalValueAcrossUsers += userData.totalValue || 0;
+      if (userData.totalCards > 0) usersWithData++;
+    });
+
+    // Get active users (logged in within last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const activeUsersQuery = query(
+      usersRef,
+      where("lastLoginAt", ">=", sevenDaysAgo)
+    );
+    const activeUsersSnapshot = await getDocs(activeUsersQuery);
+    const activeUsers = activeUsersSnapshot.size;
+
+    // Calculate system health based on available metrics
+    const endTime = Date.now();
+    const responseTime = endTime - startTime;
+
+    const systemHealth = calculateSystemHealth({
+      totalUsers,
+      activeUsers,
+      newUsersThisMonth,
+      responseTime,
+      usersWithData,
+      totalCardsAcrossUsers,
+    });
+
+    return {
+      success: true,
+      data: {
+        totalUsers,
+        newUsersThisMonth,
+        activeUsers,
+        totalCardsAcrossUsers,
+        totalValueAcrossUsers,
+        systemHealth: systemHealth.status,
+        healthDetails: systemHealth.details,
+        responseTime,
+      },
+    };
+  } catch (error) {
+    console.error("Error getting admin stats:", error);
+    return { success: false, error: getFriendlyErrorMessage(error) };
+  }
+};
+
+// Helper function to calculate system health
+const calculateSystemHealth = ({
+  totalUsers,
+  activeUsers,
+  newUsersThisMonth,
+  responseTime,
+  usersWithData,
+  totalCardsAcrossUsers,
+}) => {
+  let healthScore = 100;
+  const issues = [];
+
+  // Response time check (should be under 2 seconds)
+  if (responseTime > 2000) {
+    healthScore -= 20;
+    issues.push("Slow database response");
+  }
+
+  // User activity check (at least 10% of users should be active)
+  const activityRate = totalUsers > 0 ? (activeUsers / totalUsers) * 100 : 100;
+  if (activityRate < 10 && totalUsers > 10) {
+    healthScore -= 15;
+    issues.push("Low user activity");
+  }
+
+  // Data health check (users should have data)
+  const dataRate = totalUsers > 0 ? (usersWithData / totalUsers) * 100 : 100;
+  if (dataRate < 30 && totalUsers > 5) {
+    healthScore -= 10;
+    issues.push("Many users have no data");
+  }
+
+  // Growth check (should have some new users if not a new app)
+  if (totalUsers > 20 && newUsersThisMonth === 0) {
+    healthScore -= 10;
+    issues.push("No new user growth");
+  }
+
+  // Determine status
+  let status;
+  if (healthScore >= 90) {
+    status = "Excellent";
+  } else if (healthScore >= 75) {
+    status = "Good";
+  } else if (healthScore >= 60) {
+    status = "Fair";
+  } else if (healthScore >= 40) {
+    status = "Poor";
+  } else {
+    status = "Critical";
+  }
+
+  return {
+    status,
+    score: healthScore,
+    details: {
+      responseTime: `${responseTime}ms`,
+      activityRate: `${activityRate.toFixed(1)}%`,
+      dataRate: `${dataRate.toFixed(1)}%`,
+      issues: issues.length > 0 ? issues : ["All systems normal"],
+    },
+  };
+};
+
+export const getAllUsers = async (limit = 50) => {
+  try {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, orderBy("createdAt", "desc"), limit(limit));
+    const querySnapshot = await getDocs(q);
+
+    const users = querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return { success: true, data: users };
+  } catch (error) {
+    console.error("Error getting all users:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };

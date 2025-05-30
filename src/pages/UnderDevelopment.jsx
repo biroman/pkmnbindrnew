@@ -130,23 +130,6 @@ const UnderDevelopment = () => {
           </div>
         </div>
 
-        {/* Contact */}
-        <div className="space-y-4">
-          <p className="text-gray-600 dark:text-gray-400">
-            Have questions or want to get notified when we launch?
-          </p>
-          <div className="flex justify-center space-x-4">
-            <button className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200">
-              <Mail className="h-4 w-4 mr-2" />
-              Get Notified
-            </button>
-            <button className="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors duration-200">
-              <Github className="h-4 w-4 mr-2" />
-              Follow Progress
-            </button>
-          </div>
-        </div>
-
         {/* Footer */}
         <div className="pt-8 border-t border-gray-200/30 dark:border-gray-700/30">
           <p className="text-sm text-gray-500 dark:text-gray-400">

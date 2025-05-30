@@ -27,17 +27,17 @@ const Header = () => {
   const navigationItems = [
     {
       name: "Dashboard",
-      href: "/dashboard",
+      href: "/app/dashboard",
       icon: Home,
     },
     {
       name: "Binders",
-      href: "/collections",
+      href: "/app/collections",
       icon: Folder,
     },
     {
       name: "Statistics",
-      href: "/stats",
+      href: "/app/stats",
       icon: BarChart3,
     },
   ];
@@ -53,7 +53,7 @@ const Header = () => {
 
   const handleSettingsClick = () => {
     setIsDropdownOpen(false);
-    navigate("/profile");
+    navigate("/app/profile");
   };
 
   const toggleDropdown = () => {

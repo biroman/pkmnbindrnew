@@ -6,6 +6,7 @@ import Button from "../ui/Button";
 import Alert from "../ui/Alert";
 import GoogleSignInButton from "./GoogleSignInButton";
 import AuthDivider from "./AuthDivider";
+import { getFriendlyErrorMessage } from "../../utils/errorMessages";
 
 const SignupForm = ({ onToggleMode }) => {
   const [formData, setFormData] = useState({
@@ -61,7 +62,7 @@ const SignupForm = ({ onToggleMode }) => {
       setLoading(true);
       await signup(formData.email, formData.password, formData.displayName);
     } catch (error) {
-      setError("Failed to create account: " + error.message);
+      setError(getFriendlyErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,7 @@ const SignupForm = ({ onToggleMode }) => {
       setLoading(true);
       await signinWithGoogle();
     } catch (error) {
-      setError("Failed to sign in with Google: " + error.message);
+      setError(getFriendlyErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -98,12 +99,12 @@ const SignupForm = ({ onToggleMode }) => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Input
-          label="Full name"
+          label="Display name"
           name="displayName"
           type="text"
           value={formData.displayName}
           onChange={handleChange}
-          placeholder="Enter your full name"
+          placeholder="Enter your display name"
           required
         />
 

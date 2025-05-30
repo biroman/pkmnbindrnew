@@ -16,6 +16,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 // Helper function to get user's document reference
 const getUserDocRef = (userId) => doc(db, "users", userId);
@@ -46,7 +47,7 @@ export const createUserProfile = async (userId, userData) => {
     return { success: true, data: profileData };
   } catch (error) {
     console.error("Error creating user profile:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -62,7 +63,7 @@ export const getUserProfile = async (userId) => {
     }
   } catch (error) {
     console.error("Error getting user profile:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -78,7 +79,7 @@ export const updateUserProfile = async (userId, updates) => {
     return { success: true };
   } catch (error) {
     console.error("Error updating user profile:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -122,7 +123,7 @@ export const addCard = async (userId, cardData) => {
     return { success: true, cardId: cardDocRef.id };
   } catch (error) {
     console.error("Error adding card:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -151,7 +152,7 @@ export const getUserCards = async (userId, options = {}) => {
     return { success: true, data: cards };
   } catch (error) {
     console.error("Error getting user cards:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -167,7 +168,7 @@ export const updateCard = async (userId, cardId, updates) => {
     return { success: true };
   } catch (error) {
     console.error("Error updating card:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -208,7 +209,7 @@ export const deleteCard = async (userId, cardId) => {
     return { success: true };
   } catch (error) {
     console.error("Error deleting card:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -239,7 +240,7 @@ export const createCollection = async (userId, collectionData) => {
     return { success: true, collectionId: docRef.id };
   } catch (error) {
     console.error("Error creating collection:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -257,7 +258,7 @@ export const getUserCollections = async (userId) => {
     return { success: true, data: collections };
   } catch (error) {
     console.error("Error getting user collections:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -276,7 +277,7 @@ export const addToWishlist = async (userId, cardData) => {
     return { success: true, wishlistId: docRef.id };
   } catch (error) {
     console.error("Error adding to wishlist:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -294,7 +295,7 @@ export const getUserWishlist = async (userId) => {
     return { success: true, data: wishlist };
   } catch (error) {
     console.error("Error getting user wishlist:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
@@ -318,6 +319,6 @@ export const getUserActivity = async (userId, limitCount = 10) => {
     return { success: true, data: activities };
   } catch (error) {
     console.error("Error getting user activity:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };

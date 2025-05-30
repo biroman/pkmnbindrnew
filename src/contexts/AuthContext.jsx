@@ -15,6 +15,7 @@ import {
   getUserProfile,
   updateUserProfile,
 } from "../services/firestore";
+import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
 const AuthContext = createContext();
 
@@ -153,7 +154,7 @@ export const AuthProvider = ({ children }) => {
       return result;
     } catch (error) {
       console.error("Error updating user profile:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: getFriendlyErrorMessage(error) };
     }
   };
 

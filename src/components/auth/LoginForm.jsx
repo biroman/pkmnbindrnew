@@ -6,6 +6,7 @@ import Button from "../ui/Button";
 import Alert from "../ui/Alert";
 import GoogleSignInButton from "./GoogleSignInButton";
 import AuthDivider from "./AuthDivider";
+import { getFriendlyErrorMessage } from "../../utils/errorMessages";
 
 const LoginForm = ({ onToggleMode }) => {
   const [formData, setFormData] = useState({
@@ -37,7 +38,7 @@ const LoginForm = ({ onToggleMode }) => {
       setLoading(true);
       await signin(formData.email, formData.password);
     } catch (error) {
-      setError("Failed to sign in: " + error.message);
+      setError(getFriendlyErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -49,7 +50,7 @@ const LoginForm = ({ onToggleMode }) => {
       setLoading(true);
       await signinWithGoogle();
     } catch (error) {
-      setError("Failed to sign in with Google: " + error.message);
+      setError(getFriendlyErrorMessage(error));
     } finally {
       setLoading(false);
     }

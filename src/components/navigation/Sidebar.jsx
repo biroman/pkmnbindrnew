@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useState } from "react";
 
-const Sidebar = () => {
+const Sidebar = ({ onNavigate }) => {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -54,6 +54,13 @@ const Sidebar = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const handleNavClick = () => {
+    // Close mobile sidebar when navigation item is clicked
+    if (onNavigate) {
+      onNavigate();
+    }
+  };
+
   return (
     <div
       className={`bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ${
@@ -68,9 +75,10 @@ const Sidebar = () => {
               Navigation
             </h2>
           )}
+          {/* Only show collapse button on desktop */}
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="hidden lg:block p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <span className="text-lg">{isCollapsed ? "→" : "←"}</span>
@@ -84,6 +92,7 @@ const Sidebar = () => {
           <NavLink
             key={item.name}
             to={item.href}
+            onClick={handleNavClick}
             className={({ isActive }) =>
               `group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
                 isActive

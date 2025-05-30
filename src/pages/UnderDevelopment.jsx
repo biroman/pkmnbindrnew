@@ -2,12 +2,10 @@ import { useState, useEffect } from "react";
 import {
   Wrench,
   Clock,
-  Shield,
   Heart,
-  Github,
-  Mail,
   ArrowRight,
   Sparkles,
+  Cloud,
 } from "lucide-react";
 
 const UnderDevelopment = () => {
@@ -70,12 +68,12 @@ const UnderDevelopment = () => {
           </div>
 
           <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
-            <Shield className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-3" />
+            <Cloud className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-3" />
             <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
               Security
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Your data is safe with us during development
+              Adding possibility to store your collection in the cloud.
             </p>
           </div>
 

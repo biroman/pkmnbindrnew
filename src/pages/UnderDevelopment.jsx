@@ -133,7 +133,7 @@ const UnderDevelopment = () => {
         {/* Footer */}
         <div className="pt-8 border-t border-gray-200/30 dark:border-gray-700/30">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            © 2024 Pokemon Binder. Currently in development.
+            © 2025 Pokemon Binder. Currently in development.
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
             Status: Development Mode • Last updated:{" "}

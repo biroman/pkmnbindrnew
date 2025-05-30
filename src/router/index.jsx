@@ -20,6 +20,7 @@ const Wishlist = lazy(() => import("../pages/Wishlist"));
 const Statistics = lazy(() => import("../pages/Statistics"));
 const Profile = lazy(() => import("../pages/Profile"));
 const NotFound = lazy(() => import("../pages/NotFound"));
+const UnderDevelopment = lazy(() => import("../pages/UnderDevelopment"));
 
 // Loading component for Suspense
 const PageLoader = () => (
@@ -38,6 +39,16 @@ const LazyRoute = ({ children }) => (
 
 // Router configuration
 export const router = createBrowserRouter([
+  // Landing page - Under Development
+  {
+    path: "/",
+    element: (
+      <LazyRoute>
+        <UnderDevelopment />
+      </LazyRoute>
+    ),
+  },
+
   // Public routes (redirect to dashboard if authenticated)
   {
     path: "/auth",
@@ -50,16 +61,16 @@ export const router = createBrowserRouter([
     ),
   },
 
-  // Protected routes (require authentication)
+  // Protected routes (require authentication) - accessible via direct URLs
   {
-    path: "/",
+    path: "/app",
     element: (
       <ProtectedRoute>
         <AppLayout />
       </ProtectedRoute>
     ),
     children: [
-      // Default redirect to dashboard
+      // Dashboard
       {
         index: true,
         element: (
@@ -68,8 +79,6 @@ export const router = createBrowserRouter([
           </LazyRoute>
         ),
       },
-
-      // Dashboard
       {
         path: "dashboard",
         element: (

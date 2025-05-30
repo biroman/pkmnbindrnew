@@ -146,11 +146,6 @@ const Header = () => {
                 className="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label="User menu"
               >
-                {/* Username - hidden on very small screens */}
-                <span className="hidden sm:block text-sm font-medium text-gray-900 dark:text-white">
-                  {displayName}
-                </span>
-
                 {/* Profile image/avatar */}
                 {photoURL ? (
                   <img
@@ -165,6 +160,10 @@ const Header = () => {
                     </span>
                   </div>
                 )}
+                {/* Username - hidden on very small screens */}
+                <span className="hidden sm:block text-sm font-medium text-gray-900 dark:text-white">
+                  {displayName}
+                </span>
 
                 {/* Dropdown indicator - hidden on mobile */}
                 <ChevronDown
@@ -185,11 +184,6 @@ const Header = () => {
                     <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                       {email}
                     </p>
-                    {userProfile && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        {userProfile.totalCards} cards
-                      </p>
-                    )}
                   </div>
 
                   {/* Menu Items */}

@@ -8,6 +8,11 @@ import {
   signInWithPopup,
   sendPasswordResetEmail,
   updateProfile,
+  updatePassword,
+  sendEmailVerification,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  reload,
 } from "firebase/auth";
 import { auth } from "../config/firebase";
 import {
@@ -157,6 +162,68 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Change user password
+  const changePassword = async (currentPassword, newPassword) => {
+    if (!currentUser) {
+      throw new Error("No user logged in");
+    }
+
+    try {
+      // Re-authenticate user before changing password
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Update password
+      await updatePassword(currentUser, newPassword);
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Send email verification
+  const sendVerificationEmail = async () => {
+    if (!currentUser) {
+      throw new Error("No user logged in");
+    }
+
+    try {
+      await sendEmailVerification(currentUser);
+      return { success: true };
+    } catch (error) {
+      console.error("Error sending verification email:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Check if email is verified
+  const isEmailVerified = () => {
+    return currentUser?.emailVerified || false;
+  };
+
+  // Refresh user data to check verification status
+  const refreshUser = async () => {
+    if (!currentUser) {
+      throw new Error("No user logged in");
+    }
+
+    try {
+      await reload(currentUser);
+      // Force React to update by creating a new user object with the fresh data
+      const refreshedUser = auth.currentUser;
+      setCurrentUser(refreshedUser);
+      return { success: true };
+    } catch (error) {
+      console.error("Error refreshing user:", error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -185,6 +252,10 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updateUserProfile: updateUserProfileAuth,
     updateUserFirestoreProfile,
+    changePassword,
+    sendVerificationEmail,
+    isEmailVerified,
+    refreshUser,
     loading,
   };
 

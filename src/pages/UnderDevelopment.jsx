@@ -53,7 +53,7 @@ const UnderDevelopment = () => {
 
           <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-lg mx-auto leading-relaxed">
             Pokemon Binder is currently under development. We're crafting an
-            incredible experience for Pokemon card collectors worldwide.
+            incredible experience for all of you.
           </p>
         </div>
 
@@ -102,7 +102,7 @@ const UnderDevelopment = () => {
             <div className="space-y-3">
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Digital Card Collection Management</span>
+                <span>Better user experience</span>
               </div>
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
@@ -116,7 +116,7 @@ const UnderDevelopment = () => {
             <div className="space-y-3">
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Wishlist & Trading Features</span>
+                <span>Share your collection with friends</span>
               </div>
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />

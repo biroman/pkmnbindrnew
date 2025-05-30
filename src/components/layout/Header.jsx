@@ -9,15 +9,38 @@ import {
   Settings,
   ChevronDown,
   User,
+  Home,
+  BarChart3,
+  Folder,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, NavLink } from "react-router-dom";
 
-const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
+const Header = () => {
   const { currentUser, userProfile, logout, loading } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const navigationItems = [
+    {
+      name: "Dashboard",
+      href: "/dashboard",
+      icon: Home,
+    },
+    {
+      name: "Binders",
+      href: "/collections",
+      icon: Folder,
+    },
+    {
+      name: "Statistics",
+      href: "/stats",
+      icon: BarChart3,
+    },
+  ];
 
   const handleLogout = async () => {
     try {
@@ -35,6 +58,10 @@ const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
 
   const toggleDropdown = () => {
     setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   // Close dropdown when clicking outside
@@ -59,45 +86,53 @@ const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
   return (
     <header className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 relative z-30">
       <div className="w-full flex justify-between items-center h-16">
-        {/* Left side - Logo + Title aligned with sidebar */}
+        {/* Left side - Logo + Title */}
         <div className="flex items-center">
-          {/* Mobile hamburger menu - only visible on mobile */}
+          {/* Mobile hamburger menu - for navigation */}
           <button
-            onClick={onToggleMobileSidebar}
+            onClick={toggleMobileMenu}
             className="lg:hidden ml-4 mr-2 p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Toggle mobile menu"
+            aria-label="Toggle mobile navigation"
           >
-            {isMobileSidebarOpen ? (
+            {isMobileMenuOpen ? (
               <X className="h-6 w-6" />
             ) : (
               <Menu className="h-6 w-6" />
             )}
           </button>
 
-          {/* Desktop: Logo + Title positioned to align with sidebar content */}
-          <div className="hidden lg:flex items-center ml-5">
-            {/* Placeholder Logo */}
+          {/* Logo + Title */}
+          <div className="flex items-center ml-2 lg:ml-6">
             <div className="flex-shrink-0 mr-3">
               <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400" />
             </div>
-            {/* Title */}
             <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
               Pokemon Binder
             </h1>
           </div>
-
-          {/* Mobile: Logo + Title with different positioning */}
-          <div className="flex lg:hidden items-center">
-            {/* Placeholder Logo */}
-            <div className="flex-shrink-0 mr-3">
-              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-            </div>
-            {/* Title */}
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-              Pokemon Binder
-            </h1>
-          </div>
         </div>
+
+        {/* Center - Desktop Navigation */}
+        <nav className="hidden lg:flex items-center space-x-8">
+          {navigationItems.map((item) => {
+            const IconComponent = item.icon;
+            const isActive = location.pathname === item.href;
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                  isActive
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                    : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                <IconComponent className="h-4 w-4" />
+                <span>{item.name}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
 
         {/* Right side - Theme toggle + User Profile Dropdown */}
         <div className="flex items-center space-x-2 sm:space-x-4 px-4 sm:px-6 lg:px-8">
@@ -190,6 +225,33 @@ const Header = ({ onToggleMobileSidebar, isMobileSidebarOpen }) => {
           )}
         </div>
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <nav className="px-4 py-2 space-y-1">
+            {navigationItems.map((item) => {
+              const IconComponent = item.icon;
+              const isActive = location.pathname === item.href;
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                    isActive
+                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                      : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  <IconComponent className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </NavLink>
+              );
+            })}
+          </nav>
+        </div>
+      )}
     </header>
   );
 };

@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write documents within their own user directory
+    match /users/{userId}/{documents=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // If you have other collections that need different rules, define them here.
+    // For example, if you had a public 'sets' collection:
+    // match /pokemonSets/{setId} {
+    //   allow read: if true; // Anyone can read sets
+    //   allow write: if false; // No one can write directly to sets from client
+    // }
+  }
+}

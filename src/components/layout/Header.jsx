@@ -110,13 +110,18 @@ const Header = () => {
           {/* Logo + Title */}
           <div className="flex items-center ml-2 lg:ml-6">
             <div className="flex-shrink-0 mr-3">
-              <ShieldCheck className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+              <img
+                src="/logo.png"
+                alt="Pokemon Binder Logo"
+                className="h-7 w-7 lg:h-20 lg:w-20 object-contain"
+                onError={(e) => {
+                  // Fallback to ShieldCheck icon if logo fails to load
+                  e.target.style.display = "none";
+                  e.target.nextElementSibling.style.display = "block";
+                }}
+              />
+              <ShieldCheck className="h-7 w-7 lg:h-8 lg:w-8 text-blue-600 dark:text-blue-400 hidden" />
             </div>
-            <Link to="/app/dashboard">
-              <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
-                Pokemon Binder
-              </h1>
-            </Link>
           </div>
         </div>
 

@@ -34,10 +34,19 @@ const UnderDevelopment = () => {
         {/* Animated Logo/Icon */}
         <div className="relative">
           <div className="mx-auto w-24 h-24 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-6 relative overflow-hidden">
-            <Wrench className="h-12 w-12 text-blue-600 dark:text-blue-400 animate-pulse" />
+            <img
+              src="/logo.png"
+              alt="Pokemon Binder Logo"
+              className="h-18 w-18 object-contain animate-pulse"
+              onError={(e) => {
+                // Fallback to Wrench icon if logo fails to load
+                e.target.style.display = "none";
+                e.target.nextElementSibling.style.display = "block";
+              }}
+            />
+            <Wrench className="h-12 w-12 text-blue-600 dark:text-blue-400 animate-pulse hidden" />
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
           </div>
-          <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-yellow-400 animate-bounce" />
         </div>
 
         {/* Main Content */}
@@ -83,10 +92,10 @@ const UnderDevelopment = () => {
               Progress
             </h3>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full w-3/4 animate-pulse"></div>
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full w-2/5 animate-pulse"></div>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-300">
-              75% Complete
+              45% Complete
             </p>
           </div>
         </div>

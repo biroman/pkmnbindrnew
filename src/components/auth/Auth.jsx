@@ -2,6 +2,7 @@ import { useState } from "react";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
 import ThemeToggle from "../ui/ThemeToggle";
+import { BookOpen, ChartBar, Search, Share } from "lucide-react";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -27,27 +28,42 @@ const Auth = () => {
           <div className="absolute -bottom-40 -right-32 w-80 h-80 rounded-full bg-white/10 blur-3xl"></div>
 
           <div className="relative z-10 text-center">
-            <h1 className="text-6xl font-bold mb-6">Pokemon Binder</h1>
-            <p className="text-xl opacity-90 mb-8 max-w-md">
-              Organize, track, and manage your Pokemon card collection like
+            {/* Logo */}
+            <div>
+              <img
+                src="/logo.png"
+                alt="Pokemon Binder Logo"
+                className="h-70 w-70 mx-auto object-contain"
+                onError={(e) => {
+                  // Fallback if logo fails to load
+                  e.target.style.display = "none";
+                }}
+              />
+            </div>
+
+            <p className="text-lg lg:text-xl opacity-90 mb-8 max-w-md mx-auto leading-relaxed">
+              Organize, track, and manage your Pokemon binder collection like
               never before.
             </p>
-            <div className="space-y-4 text-left">
+
+            <div className="space-y-4 text-left max-w-sm mx-auto">
               <div className="flex items-center space-x-3">
-                <span className="text-2xl">📱</span>
-                <span>Digital card collection management</span>
+                <BookOpen className="h-6 w-6 text-red-400 flex-shrink-0" />
+                <span className="text-white/90">
+                  Digital binder collection management
+                </span>
               </div>
               <div className="flex items-center space-x-3">
-                <span className="text-2xl">📊</span>
-                <span>Real-time value tracking</span>
+                <ChartBar className="h-6 w-6 text-orange-400 flex-shrink-0" />
+                <span className="text-white/90">
+                  Real-time binder value tracking
+                </span>
               </div>
               <div className="flex items-center space-x-3">
-                <span className="text-2xl">⭐</span>
-                <span>Wishlist and favorites system</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl">🔍</span>
-                <span>Advanced search and filtering</span>
+                <Share className="h-6 w-6 text-blue-400 flex-shrink-0" />
+                <span className="text-white/90">
+                  Share binders with friends
+                </span>
               </div>
             </div>
           </div>

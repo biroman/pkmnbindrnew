@@ -162,11 +162,6 @@ const Header = () => {
                     </span>
                   </div>
                 )}
-                {/* Username - hidden on very small screens */}
-                <span className="hidden sm:block text-sm font-medium text-gray-900 dark:text-white">
-                  {displayName}
-                </span>
-
                 {/* Dropdown indicator - hidden on mobile */}
                 <ChevronDown
                   className={`hidden sm:block h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform ${
@@ -182,20 +177,19 @@ const Header = () => {
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        <p
+                          className={`text-sm font-bold ${
+                            isOwner()
+                              ? "text-purple-600 dark:text-purple-400"
+                              : "text-gray-900 dark:text-white"
+                          }`}
+                        >
                           {displayName}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {email}
                         </p>
                       </div>
-                      {isOwner() && (
-                        <div className="ml-2">
-                          <span className="inline-flex items-center px-2 py-1 text-xs font-semibold text-purple-800 bg-purple-100 dark:text-purple-200 dark:bg-purple-900/30 rounded-full">
-                            Owner
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
 

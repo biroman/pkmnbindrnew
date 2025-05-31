@@ -22,17 +22,20 @@ import {
 } from "../services/firestore";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
 
-const AuthContext = createContext();
+// Create context
+const AuthContext = createContext({});
 
-export const useAuth = () => {
+// Custom hook
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-};
+}
 
-export const AuthProvider = ({ children }) => {
+// Provider component
+export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -253,7 +256,7 @@ export const AuthProvider = ({ children }) => {
         return role === "owner";
 
       case "manage_collection":
-      case "add_cards":
+      case "add_binders":
       case "create_wishlist":
         return role === "owner" || role === "user";
 
@@ -280,7 +283,7 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const value = {
+  const contextValue = {
     currentUser,
     userProfile,
     signup,
@@ -303,8 +306,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={contextValue}>
       {!loading && children}
     </AuthContext.Provider>
   );
-};
+}

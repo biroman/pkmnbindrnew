@@ -50,9 +50,6 @@ const AccountDetails = ({
                 <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
                   Owner
                 </span>
-                <span className="ml-2 px-2 py-1 text-xs font-semibold text-purple-800 bg-purple-100 dark:text-purple-200 dark:bg-purple-900/30 rounded-full">
-                  Admin
-                </span>
               </>
             ) : (
               <>

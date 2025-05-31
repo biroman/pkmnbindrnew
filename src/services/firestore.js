@@ -38,7 +38,7 @@ export const createUserProfile = async (userId, userData) => {
     const profileData = {
       ...userData,
       role: userRole,
-      totalCards: 0,
+      totalBinders: 0,
       totalValue: 0,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
@@ -89,54 +89,54 @@ export const updateUserProfile = async (userId, updates) => {
   }
 };
 
-// ===== CARD OPERATIONS =====
+// ===== BINDER OPERATIONS =====
 
-export const addCard = async (userId, cardData) => {
+export const addBinder = async (userId, binderData) => {
   try {
     const batch = writeBatch(db);
 
-    // Add card to user's cards collection
-    const cardsRef = getUserSubcollection(userId, "cards");
-    const cardDocRef = doc(cardsRef);
+    // Add binder to user's binders collection
+    const bindersRef = getUserSubcollection(userId, "binders");
+    const binderDocRef = doc(bindersRef);
 
-    const card = {
-      ...cardData,
+    const binder = {
+      ...binderData,
       addedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       isFavorite: false,
     };
 
-    batch.set(cardDocRef, card);
+    batch.set(binderDocRef, binder);
 
-    // Update user's total cards count
+    // Update user's total binders count
     const userDocRef = getUserDocRef(userId);
     batch.update(userDocRef, {
-      totalCards: increment(1),
-      totalValue: increment(cardData.currentValue || 0),
+      totalBinders: increment(1),
+      totalValue: increment(binderData.currentValue || 0),
     });
 
     // Add activity log
     const activityRef = getUserSubcollection(userId, "activity");
     const activityDocRef = doc(activityRef);
     batch.set(activityDocRef, {
-      type: "card_added",
-      description: `Added ${cardData.name} to collection`,
-      cardRef: cardDocRef,
+      type: "binder_added",
+      description: `Added ${binderData.name} to collection`,
+      binderRef: binderDocRef,
       timestamp: serverTimestamp(),
     });
 
     await batch.commit();
-    return { success: true, cardId: cardDocRef.id };
+    return { success: true, binderId: binderDocRef.id };
   } catch (error) {
-    console.error("Error adding card:", error);
+    console.error("Error adding binder:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
-export const getUserCards = async (userId, options = {}) => {
+export const getUserBinders = async (userId, options = {}) => {
   try {
-    const cardsRef = getUserSubcollection(userId, "cards");
-    let q = query(cardsRef, orderBy("addedAt", "desc"));
+    const bindersRef = getUserSubcollection(userId, "binders");
+    let q = query(bindersRef, orderBy("addedAt", "desc"));
 
     // Apply filters if provided
     if (options.rarity) {
@@ -150,71 +150,71 @@ export const getUserCards = async (userId, options = {}) => {
     }
 
     const querySnapshot = await getDocs(q);
-    const cards = querySnapshot.docs.map((doc) => ({
+    const binders = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
 
-    return { success: true, data: cards };
+    return { success: true, data: binders };
   } catch (error) {
-    console.error("Error getting user cards:", error);
+    console.error("Error getting user binders:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
-export const updateCard = async (userId, cardId, updates) => {
+export const updateBinder = async (userId, binderId, updates) => {
   try {
-    const cardDocRef = doc(getUserSubcollection(userId, "cards"), cardId);
+    const binderDocRef = doc(getUserSubcollection(userId, "binders"), binderId);
     const updateData = {
       ...updates,
       updatedAt: serverTimestamp(),
     };
 
-    await updateDoc(cardDocRef, updateData);
+    await updateDoc(binderDocRef, updateData);
     return { success: true };
   } catch (error) {
-    console.error("Error updating card:", error);
+    console.error("Error updating binder:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
 
-export const deleteCard = async (userId, cardId) => {
+export const deleteBinder = async (userId, binderId) => {
   try {
     const batch = writeBatch(db);
 
-    // Get card data first to update totals
-    const cardDocRef = doc(getUserSubcollection(userId, "cards"), cardId);
-    const cardDoc = await getDoc(cardDocRef);
+    // Get binder data first to update totals
+    const binderDocRef = doc(getUserSubcollection(userId, "binders"), binderId);
+    const binderDoc = await getDoc(binderDocRef);
 
-    if (!cardDoc.exists()) {
-      return { success: false, error: "Card not found" };
+    if (!binderDoc.exists()) {
+      return { success: false, error: "Binder not found" };
     }
 
-    const cardData = cardDoc.data();
+    const binderData = binderDoc.data();
 
-    // Delete the card
-    batch.delete(cardDocRef);
+    // Delete the binder
+    batch.delete(binderDocRef);
 
     // Update user's totals
     const userDocRef = getUserDocRef(userId);
     batch.update(userDocRef, {
-      totalCards: increment(-1),
-      totalValue: increment(-(cardData.currentValue || 0)),
+      totalBinders: increment(-1),
+      totalValue: increment(-(binderData.currentValue || 0)),
     });
 
     // Add activity log
     const activityRef = getUserSubcollection(userId, "activity");
     const activityDocRef = doc(activityRef);
     batch.set(activityDocRef, {
-      type: "card_removed",
-      description: `Removed ${cardData.name} from collection`,
+      type: "binder_removed",
+      description: `Removed ${binderData.name} from collection`,
       timestamp: serverTimestamp(),
     });
 
     await batch.commit();
     return { success: true };
   } catch (error) {
-    console.error("Error deleting card:", error);
+    console.error("Error deleting binder:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };
@@ -270,11 +270,11 @@ export const getUserCollections = async (userId) => {
 
 // ===== WISHLIST OPERATIONS =====
 
-export const addToWishlist = async (userId, cardData) => {
+export const addToWishlist = async (userId, binderData) => {
   try {
     const wishlistRef = getUserSubcollection(userId, "wishlist");
     const wishlistItem = {
-      ...cardData,
+      ...binderData,
       priority: "Medium",
       addedAt: serverTimestamp(),
     };
@@ -329,6 +329,54 @@ export const getUserActivity = async (userId, limitCount = 10) => {
   }
 };
 
+// ===== MIGRATION FUNCTIONS =====
+
+export const migrateUserRoles = async () => {
+  try {
+    console.log("Starting user role migration...");
+
+    const ownerEmail = import.meta.env.VITE_OWNER_EMAIL;
+    const usersRef = collection(db, "users");
+
+    // Get all users without ordering (to avoid permission issues)
+    const querySnapshot = await getDocs(usersRef);
+
+    console.log(`Found ${querySnapshot.size} users to check for migration`);
+
+    const batch = writeBatch(db);
+    let updatedCount = 0;
+
+    querySnapshot.docs.forEach((doc) => {
+      const userData = doc.data();
+
+      // Check if user already has a role field
+      if (!userData.role) {
+        console.log(`Migrating user ${doc.id} (${userData.email})`);
+
+        const userRole = userData.email === ownerEmail ? "owner" : "user";
+
+        batch.update(doc.ref, {
+          role: userRole,
+        });
+
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      await batch.commit();
+      console.log(`Migration completed. Updated ${updatedCount} users.`);
+      return { success: true, updatedCount };
+    } else {
+      console.log("No users needed migration.");
+      return { success: true, updatedCount: 0 };
+    }
+  } catch (error) {
+    console.error("Error during user role migration:", error);
+    return { success: false, error: getFriendlyErrorMessage(error) };
+  }
+};
+
 // ===== ADMIN OPERATIONS (Owner Only) =====
 
 export const getAdminStats = async () => {
@@ -351,16 +399,16 @@ export const getAdminStats = async () => {
     const recentUsersSnapshot = await getDocs(recentUsersQuery);
     const newUsersThisMonth = recentUsersSnapshot.size;
 
-    // Calculate total cards across all users
-    let totalCardsAcrossUsers = 0;
+    // Calculate total binders across all users
+    let totalBindersAcrossUsers = 0;
     let totalValueAcrossUsers = 0;
     let usersWithData = 0;
 
     usersSnapshot.docs.forEach((doc) => {
       const userData = doc.data();
-      totalCardsAcrossUsers += userData.totalCards || 0;
+      totalBindersAcrossUsers += userData.totalBinders || 0;
       totalValueAcrossUsers += userData.totalValue || 0;
-      if (userData.totalCards > 0) usersWithData++;
+      if (userData.totalBinders > 0) usersWithData++;
     });
 
     // Get active users (logged in within last 7 days)
@@ -384,7 +432,7 @@ export const getAdminStats = async () => {
       newUsersThisMonth,
       responseTime,
       usersWithData,
-      totalCardsAcrossUsers,
+      totalBindersAcrossUsers,
     });
 
     return {
@@ -393,7 +441,7 @@ export const getAdminStats = async () => {
         totalUsers,
         newUsersThisMonth,
         activeUsers,
-        totalCardsAcrossUsers,
+        totalBindersAcrossUsers,
         totalValueAcrossUsers,
         systemHealth: systemHealth.status,
         healthDetails: systemHealth.details,
@@ -413,7 +461,7 @@ const calculateSystemHealth = ({
   newUsersThisMonth,
   responseTime,
   usersWithData,
-  totalCardsAcrossUsers,
+  totalBindersAcrossUsers,
 }) => {
   let healthScore = 100;
   const issues = [];
@@ -470,20 +518,35 @@ const calculateSystemHealth = ({
   };
 };
 
-export const getAllUsers = async (limit = 50) => {
+export const getAllUsers = async (limitCount = 50) => {
   try {
+    console.log("getAllUsers: Starting query...");
+
     const usersRef = collection(db, "users");
-    const q = query(usersRef, orderBy("createdAt", "desc"), limit(limit));
+    const q = query(usersRef, orderBy("createdAt", "desc"), limit(limitCount));
+
+    console.log("getAllUsers: Query created, executing...");
+
     const querySnapshot = await getDocs(q);
 
-    const users = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    console.log("getAllUsers: Query executed, processing results...");
+    console.log("getAllUsers: Query snapshot size:", querySnapshot.size);
+
+    const users = querySnapshot.docs.map((doc) => {
+      console.log("getAllUsers: Processing user doc:", doc.id, doc.data());
+      return {
+        id: doc.id,
+        ...doc.data(),
+      };
+    });
+
+    console.log("getAllUsers: Final users array:", users);
 
     return { success: true, data: users };
   } catch (error) {
-    console.error("Error getting all users:", error);
+    console.error("getAllUsers: Error occurred:", error);
+    console.error("getAllUsers: Error code:", error.code);
+    console.error("getAllUsers: Error message:", error.message);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };

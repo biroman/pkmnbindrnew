@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import AccountInformation from "../components/profile/AccountInformation";
-import EmailVerification from "../components/profile/EmailVerification";
-import SecuritySettings from "../components/profile/SecuritySettings";
-import AdminDashboard from "../components/profile/AdminDashboard";
-import AccountDetails from "../components/profile/AccountDetails";
+import SettingsNavigation from "../components/profile/SettingsNavigation";
+import ProfileSection from "../components/profile/sections/ProfileSection";
+import SecuritySection from "../components/profile/sections/SecuritySection";
+import AccountSection from "../components/profile/sections/AccountSection";
+import AdminSection from "../components/profile/sections/AdminSection";
 
 const Profile = () => {
   const {
@@ -17,56 +18,71 @@ const Profile = () => {
     isOwner,
   } = useAuth();
 
+  const [activeSection, setActiveSection] = useState("profile");
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case "profile":
+        return (
+          <ProfileSection
+            currentUser={currentUser}
+            userProfile={userProfile}
+            updateUserFirestoreProfile={updateUserFirestoreProfile}
+          />
+        );
+      case "security":
+        return (
+          <SecuritySection
+            changePassword={changePassword}
+            isEmailVerified={isEmailVerified}
+            sendVerificationEmail={sendVerificationEmail}
+            refreshUser={refreshUser}
+          />
+        );
+      case "account":
+        return (
+          <AccountSection
+            currentUser={currentUser}
+            userProfile={userProfile}
+            isEmailVerified={isEmailVerified}
+            isOwner={isOwner}
+          />
+        );
+      case "admin":
+        return (
+          <AdminSection
+            currentUser={currentUser}
+            userProfile={userProfile}
+            isOwner={isOwner}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="p-3 sm:p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-            Profile Settings
-          </h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-            Manage your account settings, security, and preferences
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          {/* Main Settings */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Account Information */}
-            <AccountInformation
-              currentUser={currentUser}
-              userProfile={userProfile}
-              updateUserFirestoreProfile={updateUserFirestoreProfile}
-            />
-
-            {/* Email Verification */}
-            <EmailVerification
-              isEmailVerified={isEmailVerified}
-              sendVerificationEmail={sendVerificationEmail}
-              refreshUser={refreshUser}
-            />
-
-            {/* Security Settings */}
-            <SecuritySettings changePassword={changePassword} />
-
-            {/* Owner-Only Admin Section */}
-            <AdminDashboard
-              currentUser={currentUser}
-              userProfile={userProfile}
-              isOwner={isOwner}
-            />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar Navigation */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-8">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <SettingsNavigation
+                  activeSection={activeSection}
+                  onSectionChange={setActiveSection}
+                  isOwner={isOwner}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Account Details */}
-            <AccountDetails
-              currentUser={currentUser}
-              userProfile={userProfile}
-              isEmailVerified={isEmailVerified}
-              isOwner={isOwner}
-            />
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 lg:p-8">
+              {renderContent()}
+            </div>
           </div>
         </div>
       </div>

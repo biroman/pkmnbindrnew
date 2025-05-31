@@ -11,8 +11,8 @@ import {
   Gem,
   TrendingUp,
   Target,
-  Backpack,
   Package,
+  PlusCircle,
 } from "lucide-react";
 
 const WelcomeDashboard = () => {
@@ -21,7 +21,7 @@ const WelcomeDashboard = () => {
   // Calculate display values from userProfile
   const displayName =
     userProfile?.displayName || currentUser?.displayName || "Trainer";
-  const totalCards = userProfile?.totalCards || 0;
+  const totalBinders = userProfile?.totalBinders || 0;
   const totalValue = userProfile?.totalValue || 0;
   const currency = userProfile?.settings?.currency || "USD";
 
@@ -35,42 +35,113 @@ const WelcomeDashboard = () => {
     }).format(value);
   };
 
-  // Calculate completion percentage (placeholder for now)
-  const completionPercentage =
-    totalCards > 0 ? Math.min(Math.round((totalCards / 1010) * 100), 100) : 0; // 1010 total Pokemon in Gen 1-9
+  // Quick actions data
+  const quickActions = [
+    {
+      title: "Add New Binder",
+      description: "Add a new Pokemon binder to your collection",
+      icon: <PlusCircle className="h-6 w-6" />,
+      action: () => console.log("Add binder"),
+      color: "bg-blue-500 hover:bg-blue-600",
+    },
+    {
+      title: "View Collection",
+      description: "Browse your entire binder collection",
+      icon: <Library className="h-6 w-6" />,
+      action: () => console.log("View collection"),
+      color: "bg-green-500 hover:bg-green-600",
+    },
+    {
+      title: "Search Binders",
+      description: "Find specific binders in your collection",
+      icon: <Search className="h-6 w-6" />,
+      action: () => console.log("Search binders"),
+      color: "bg-purple-500 hover:bg-purple-600",
+    },
+    {
+      title: "Statistics",
+      description: "Analyze your collection statistics",
+      icon: <BarChart3 className="h-6 w-6" />,
+      action: () => console.log("View statistics"),
+      color: "bg-yellow-500 hover:bg-yellow-600",
+    },
+    {
+      title: "Favorites",
+      description: "View your favorite binders",
+      icon: <Star className="h-6 w-6" />,
+      action: () => console.log("View favorites"),
+      color: "bg-pink-500 hover:bg-pink-600",
+    },
+    {
+      title: "Rare Binders",
+      description: "Find rare and unique binders",
+      icon: <Gem className="h-6 w-6" />,
+      action: () => console.log("View rare binders"),
+      color: "bg-indigo-500 hover:bg-indigo-600",
+    },
+    {
+      title: "Price Tracker",
+      description: "Track binder prices and trends",
+      icon: <TrendingUp className="h-6 w-6" />,
+      action: () => console.log("Track price"),
+      color: "bg-teal-500 hover:bg-teal-600",
+    },
+    {
+      title: "Wishlist",
+      description: "Manage your wishlist of binders",
+      icon: <Target className="h-6 w-6" />,
+      action: () => console.log("View wishlist"),
+      color: "bg-red-500 hover:bg-red-600",
+    },
+  ];
+
+  // Collection progress calculation (example: progress towards a goal)
+  const collectionProgress =
+    totalBinders > 0
+      ? Math.min(Math.round((totalBinders / 100) * 100), 100)
+      : 0; // Example: goal of 100 binders
 
   return (
-    <div className="w-full min-h-full px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8">
-      {/* Welcome Section */}
-      <div className="text-center">
-        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-4">
-          Welcome back, {displayName}!
-        </h1>
-        <p className="text-base sm:text-xl text-gray-600 dark:text-gray-400 max-w-4xl mx-auto px-4">
-          Ready to organize your Pokemon collection? Your digital binder awaits!
-        </p>
-        {userProfile && (
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500 mt-1 sm:mt-2">
-            Member since{" "}
-            {new Date(
-              userProfile.createdAt?.seconds * 1000
-            ).toLocaleDateString()}
-          </p>
-        )}
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
-        <Card variant="elevated" className="p-3 sm:p-6">
-          <div className="text-center">
-            <div className="text-xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1 sm:mb-2">
-              {totalCards.toLocaleString()}
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-800 dark:to-purple-800 rounded-xl shadow-sm p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold mb-2">
+              Welcome back, {displayName}! 👋
+            </h1>
+            <p className="text-blue-100 dark:text-blue-200">
+              Ready to manage your Pokemon binder collection?
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-3xl font-bold">
+              {totalBinders.toLocaleString()}
             </div>
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Pokemon Cards
+            <div className="text-blue-100 dark:text-blue-200 text-sm">
+              Total Binders
             </div>
           </div>
-        </Card>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Total Binders
+              </h3>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {totalBinders}
+              </p>
+            </div>
+          </div>
+        </div>
 
         <Card variant="elevated" className="p-3 sm:p-6">
           <div className="text-center">
@@ -89,10 +160,10 @@ const WelcomeDashboard = () => {
         >
           <div className="text-center">
             <div className="text-xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400 mb-1 sm:mb-2">
-              {completionPercentage}%
+              {collectionProgress}%
             </div>
             <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Pokedex Complete
+              Collection Progress
             </div>
           </div>
         </Card>
@@ -134,135 +205,83 @@ const WelcomeDashboard = () => {
         </Card>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-8">
-        {/* Quick Actions - Takes 2/3 width on large screens */}
-        <div className="xl:col-span-2">
-          <Card variant="elevated" className="p-4 sm:p-8 h-full">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
+      {/* Main Content Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Dashboard Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Quick Actions */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Quick Actions
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              <Link to="/add-card">
-                <Button
-                  variant="primary"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {quickActions.map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.action}
+                  className={`${action.color} text-white p-4 rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-lg group`}
                 >
-                  <Plus className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Add Cards
-                </Button>
-              </Link>
-
-              <Link to="/collection">
-                <Button
-                  variant="secondary"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <Library className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  View Collection
-                </Button>
-              </Link>
-
-              <Link to="/collection">
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <Search className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Search Cards
-                </Button>
-              </Link>
-
-              <Link to="/stats">
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Statistics
-                </Button>
-              </Link>
-
-              <Link to="/collection">
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <Star className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Favorites
-                </Button>
-              </Link>
-
-              <Link to="/collection">
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <Gem className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Rare Cards
-                </Button>
-              </Link>
-
-              <Link to="/stats">
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Price Tracker
-                </Button>
-              </Link>
-
-              <Link to="/wishlist">
-                <Button
-                  variant="outline"
-                  className="h-16 sm:h-20 flex-col w-full text-xs sm:text-sm"
-                >
-                  <Target className="h-5 w-5 sm:h-6 sm:w-6 mb-1" />
-                  Wishlist
-                </Button>
-              </Link>
+                  <div className="flex items-center space-x-3">
+                    <div className="group-hover:scale-110 transition-transform duration-200">
+                      {action.icon}
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold">{action.title}</h3>
+                      <p className="text-sm opacity-90">{action.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
-          </Card>
+          </div>
+
+          {/* Recent Activity or Collection Overview */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Collection Overview
+            </h2>
+            {totalBinders === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  Start Your Collection
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4 max-w-sm mx-auto">
+                  You haven't added any Pokemon binders yet. Start building your
+                  collection today!
+                </p>
+                <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
+                  Add Your First Binder
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Collection Progress
+                  </span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {collectionProgress}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${collectionProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  You have {totalBinders} binder{totalBinders !== 1 ? "s" : ""}{" "}
+                  in your collection worth ${totalValue.toLocaleString()}.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Recent Activity - Takes 1/3 width on large screens */}
-        <div className="xl:col-span-1">
-          <Card variant="elevated" className="p-4 sm:p-8 h-full">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
-              Recent Activity
-            </h2>
-            <div className="text-center py-4 sm:py-8">
-              <Backpack className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 text-gray-400 dark:text-gray-500" />
-              {totalCards === 0 ? (
-                <div className="space-y-4">
-                  <p className="text-sm sm:text-lg text-gray-500 dark:text-gray-400">
-                    Your journey starts here! Add your first Pokemon card to
-                    begin.
-                  </p>
-                  <Link to="/add-card">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="text-xs sm:text-sm"
-                    >
-                      Add Your First Card
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 font-medium">
-                    Collection Growing!
-                  </p>
-                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    You have {totalCards} card{totalCards !== 1 ? "s" : ""}{" "}
-                    worth {formatCurrency(totalValue)}
-                  </p>
-                </div>
-              )}
-            </div>
-          </Card>
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* ... existing sidebar content ... */}
         </div>
       </div>
     </div>

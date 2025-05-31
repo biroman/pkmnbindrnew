@@ -12,6 +12,7 @@ import {
   Home,
   BarChart3,
   Folder,
+  Plus,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, NavLink, Link } from "react-router-dom";
@@ -25,6 +26,11 @@ const Header = () => {
   const location = useLocation();
 
   const navigationItems = [
+    {
+      name: "Create Binder",
+      href: "/app/create-binder",
+      icon: Plus,
+    },
     {
       name: "Dashboard",
       href: "/app/dashboard",

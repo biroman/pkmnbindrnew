@@ -1,6 +1,9 @@
+import { forwardRef } from "react";
+import * as Switch from "@radix-ui/react-switch";
 import { useTheme } from "../../contexts/ThemeContext";
+import { cn } from "../../lib/utils";
 
-const ThemeToggle = ({ size = "md", className = "" }) => {
+const ThemeToggle = forwardRef(({ size = "md", className, ...props }, ref) => {
   const { isDark, toggleTheme } = useTheme();
 
   const sizes = {
@@ -16,24 +19,26 @@ const ThemeToggle = ({ size = "md", className = "" }) => {
   };
 
   return (
-    <button
-      onClick={toggleTheme}
-      className={`
-        ${sizes[size]} relative rounded-lg p-2 transition-all duration-200
-        bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700
-        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-        ${className}
-      `}
+    <Switch.Root
+      ref={ref}
+      checked={isDark}
+      onCheckedChange={toggleTheme}
+      className={cn(
+        sizes[size],
+        "relative rounded-lg p-2 transition-all duration-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 data-[state=checked]:bg-gray-800 data-[state=unchecked]:bg-gray-100",
+        className
+      )}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      {...props}
     >
       <div className="relative w-full h-full">
         {/* Sun Icon */}
         <svg
-          className={`
-            ${iconSizes[size]} absolute inset-0 transition-all duration-300
-            ${isDark ? "opacity-0 rotate-90" : "opacity-100 rotate-0"}
-            text-yellow-500
-          `}
+          className={cn(
+            iconSizes[size],
+            "absolute inset-0 transition-all duration-300 text-yellow-500",
+            isDark ? "opacity-0 rotate-90" : "opacity-100 rotate-0"
+          )}
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -46,19 +51,21 @@ const ThemeToggle = ({ size = "md", className = "" }) => {
 
         {/* Moon Icon */}
         <svg
-          className={`
-            ${iconSizes[size]} absolute inset-0 transition-all duration-300
-            ${isDark ? "opacity-100 rotate-0" : "opacity-0 -rotate-90"}
-            text-blue-400
-          `}
+          className={cn(
+            iconSizes[size],
+            "absolute inset-0 transition-all duration-300 text-blue-400",
+            isDark ? "opacity-100 rotate-0" : "opacity-0 -rotate-90"
+          )}
           fill="currentColor"
           viewBox="0 0 20 20"
         >
           <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
         </svg>
       </div>
-    </button>
+    </Switch.Root>
   );
-};
+});
+
+ThemeToggle.displayName = "ThemeToggle";
 
 export default ThemeToggle;

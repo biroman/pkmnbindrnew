@@ -46,6 +46,12 @@ export const createUserProfile = async (userId, userData) => {
         theme: "light",
         currency: "USD",
         publicProfile: false,
+        binderPreferences: {
+          gridSize: "3x3",
+          sortingDirection: true, // true = ascending
+          autoSave: true,
+          createdAt: serverTimestamp(),
+        },
       },
     };
 
@@ -85,6 +91,67 @@ export const updateUserProfile = async (userId, updates) => {
     return { success: true };
   } catch (error) {
     console.error("Error updating user profile:", error);
+    return { success: false, error: getFriendlyErrorMessage(error) };
+  }
+};
+
+// ===== USER PREFERENCES OPERATIONS =====
+
+export const updateUserPreferences = async (userId, preferences) => {
+  try {
+    const userDocRef = getUserDocRef(userId);
+
+    // Get current user data to merge with existing settings
+    const userDoc = await getDoc(userDocRef);
+    const currentData = userDoc.data();
+
+    // Merge new preferences with existing settings
+    const mergedSettings = {
+      ...currentData.settings,
+      binderPreferences: {
+        ...currentData.settings?.binderPreferences,
+        ...preferences,
+        updatedAt: serverTimestamp(),
+      },
+    };
+
+    await updateDoc(userDocRef, {
+      settings: mergedSettings,
+      lastLoginAt: serverTimestamp(),
+    });
+
+    return { success: true, data: mergedSettings.binderPreferences };
+  } catch (error) {
+    console.error("Error updating user preferences:", error);
+    return { success: false, error: getFriendlyErrorMessage(error) };
+  }
+};
+
+export const getUserPreferences = async (userId) => {
+  try {
+    const userDocRef = getUserDocRef(userId);
+    const docSnap = await getDoc(userDocRef);
+
+    if (docSnap.exists()) {
+      const userData = docSnap.data();
+      const preferences = userData.settings?.binderPreferences || {};
+
+      // Return default preferences if none exist
+      const defaultPreferences = {
+        gridSize: "3x3",
+        sortingDirection: true, // true = ascending
+        autoSave: true,
+      };
+
+      return {
+        success: true,
+        data: { ...defaultPreferences, ...preferences },
+      };
+    } else {
+      return { success: false, error: "User profile not found" };
+    }
+  } catch (error) {
+    console.error("Error getting user preferences:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };

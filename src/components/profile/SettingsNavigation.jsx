@@ -1,12 +1,46 @@
-import { User, Lock, Shield, Info, Crown } from "lucide-react";
+import {
+  User,
+  Lock,
+  Shield,
+  Info,
+  Crown,
+  Settings2,
+  Share2,
+  Image,
+  Bell,
+} from "lucide-react";
 
 const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
   const sections = [
     {
       id: "profile",
       name: "Profile",
-      description: "Manage your display name and basic information",
+      description: "Manage your display name and profile information",
       icon: User,
+    },
+    {
+      id: "binder-preferences",
+      name: "Binder Preferences",
+      description: "Default settings for creating and displaying binders",
+      icon: Settings2,
+    },
+    {
+      id: "privacy-sharing",
+      name: "Privacy & Sharing",
+      description: "Control who can see and share your binders",
+      icon: Share2,
+    },
+    {
+      id: "display-themes",
+      name: "Display & Themes",
+      description: "Customize appearance and binder themes",
+      icon: Image,
+    },
+    {
+      id: "notifications",
+      name: "Notifications",
+      description: "Email and in-app notification preferences",
+      icon: Bell,
     },
     {
       id: "security",
@@ -17,7 +51,7 @@ const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
     {
       id: "account",
       name: "Account",
-      description: "Account details and membership information",
+      description: "Account details and data management",
       icon: Info,
     },
   ];
@@ -40,7 +74,7 @@ const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
           Settings
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Manage your account preferences and security
+          Customize your Pokemon binder experience
         </p>
       </div>
 
@@ -80,7 +114,8 @@ const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
                   }`}
                 />
               </div>
-              <div className="flex-1 min-w-0">
+
+              <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <h3
                     className={`text-sm font-medium ${

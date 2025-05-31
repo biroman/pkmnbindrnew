@@ -5,6 +5,8 @@ import ProfileSection from "../components/profile/sections/ProfileSection";
 import SecuritySection from "../components/profile/sections/SecuritySection";
 import AccountSection from "../components/profile/sections/AccountSection";
 import AdminSection from "../components/profile/sections/AdminSection";
+import BinderPreferencesSection from "../components/profile/sections/BinderPreferencesSection";
+import PrivacySharingSection from "../components/profile/sections/PrivacySharingSection";
 
 const Profile = () => {
   const {
@@ -29,6 +31,54 @@ const Profile = () => {
             userProfile={userProfile}
             updateUserFirestoreProfile={updateUserFirestoreProfile}
           />
+        );
+      case "binder-preferences":
+        return <BinderPreferencesSection />;
+      case "privacy-sharing":
+        return <PrivacySharingSection />;
+      case "display-themes":
+        return (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Display & Themes
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Customize appearance and binder themes
+              </p>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+              <p className="text-center text-blue-600 dark:text-blue-400">
+                🎨 Theme customization coming soon!
+              </p>
+              <p className="text-center text-sm text-blue-500 dark:text-blue-300 mt-2">
+                Choose custom binder themes, card backgrounds, and visual
+                effects.
+              </p>
+            </div>
+          </div>
+        );
+      case "notifications":
+        return (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Notifications
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Email and in-app notification preferences
+              </p>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
+              <p className="text-center text-green-600 dark:text-green-400">
+                🔔 Notification settings coming soon!
+              </p>
+              <p className="text-center text-sm text-green-500 dark:text-green-300 mt-2">
+                Control notifications for binder interactions, price updates,
+                and system messages.
+              </p>
+            </div>
+          </div>
         );
       case "security":
         return (
@@ -57,7 +107,18 @@ const Profile = () => {
           />
         );
       default:
-        return null;
+        return (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Settings Not Found
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                The requested settings section could not be found.
+              </p>
+            </div>
+          </div>
+        );
     }
   };
 

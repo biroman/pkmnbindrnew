@@ -12,8 +12,17 @@ import {
   Mail,
   Activity,
 } from "lucide-react";
-import Button from "../ui/Button";
-import Input from "../ui/Input";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  FormField,
+  Label,
+} from "../ui";
 import { getAllUsers } from "../../services/firestore";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -215,35 +224,47 @@ const UserManagement = () => {
 
       {/* Search and Filter Controls */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="relative">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search users by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <FormField>
+          <Label htmlFor="search">Search Users</Label>
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              id="search"
+              placeholder="Search users by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </FormField>
 
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="createdAt">Sort by Registration Date</option>
-          <option value="lastLoginAt">Sort by Last Login</option>
-          <option value="displayName">Sort by Name</option>
-          <option value="email">Sort by Email</option>
-        </select>
+        <FormField>
+          <Label>Sort By</Label>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt">Registration Date</SelectItem>
+              <SelectItem value="lastLoginAt">Last Login</SelectItem>
+              <SelectItem value="displayName">Name</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
 
-        <select
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="desc">Newest First</option>
-          <option value="asc">Oldest First</option>
-        </select>
+        <FormField>
+          <Label>Order</Label>
+          <Select value={sortOrder} onValueChange={setSortOrder}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sort order..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Newest First</SelectItem>
+              <SelectItem value="asc">Oldest First</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormField>
       </div>
 
       {/* User Count */}

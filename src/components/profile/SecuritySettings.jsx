@@ -1,8 +1,56 @@
 import { useState, useEffect } from "react";
 import { Lock, Eye, EyeOff } from "lucide-react";
-import Input from "../ui/Input";
-import Button from "../ui/Button";
-import Alert from "../ui/Alert";
+import {
+  Input,
+  Button,
+  Alert,
+  AlertDescription,
+  FormField,
+  Label,
+  FormMessage,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "../ui";
+
+// Move PasswordField outside the main component to prevent recreation
+const PasswordField = ({
+  label,
+  value,
+  onChange,
+  placeholder,
+  showPassword,
+  onToggleShow,
+  error,
+  id,
+}) => (
+  <FormField>
+    <Label htmlFor={id}>{label}</Label>
+    <div className="relative">
+      <Input
+        id={id}
+        type={showPassword ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={error ? "border-red-500" : ""}
+      />
+      <button
+        type="button"
+        onClick={onToggleShow}
+        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+      >
+        {showPassword ? (
+          <EyeOff className="h-4 w-4" />
+        ) : (
+          <Eye className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+    {error && <FormMessage>{error}</FormMessage>}
+  </FormField>
+);
 
 const SecuritySettings = ({ changePassword }) => {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -13,6 +61,7 @@ const SecuritySettings = ({ changePassword }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordAlert, setPasswordAlert] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
 
   // Clear alerts after 5 seconds
   useEffect(() => {
@@ -21,6 +70,21 @@ const SecuritySettings = ({ changePassword }) => {
       return () => clearTimeout(timer);
     }
   }, [passwordAlert]);
+
+  // Real-time validation
+  useEffect(() => {
+    const errors = {};
+
+    if (newPassword && newPassword.length < 6) {
+      errors.newPassword = "Password must be at least 6 characters";
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      errors.confirmPassword = "Passwords do not match";
+    }
+
+    setValidationErrors(errors);
+  }, [newPassword, confirmPassword]);
 
   // Validation functions
   const validatePassword = (password) => {
@@ -68,6 +132,7 @@ const SecuritySettings = ({ changePassword }) => {
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
+        setValidationErrors({});
       } else {
         setPasswordAlert({
           type: "error",
@@ -85,94 +150,76 @@ const SecuritySettings = ({ changePassword }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center mb-6">
-        <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
           Security Settings
-        </h2>
-      </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleChangePassword} className="space-y-6">
+          {passwordAlert && (
+            <Alert
+              variant={
+                passwordAlert.type === "error" ? "destructive" : "success"
+              }
+            >
+              <AlertDescription>{passwordAlert.message}</AlertDescription>
+            </Alert>
+          )}
 
-      <form onSubmit={handleChangePassword} className="space-y-4">
-        <Alert alert={passwordAlert} />
-
-        <div className="relative">
-          <Input
+          <PasswordField
+            id="current-password"
             label="Current Password"
-            type={showCurrentPassword ? "text" : "password"}
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder="Enter your current password"
+            showPassword={showCurrentPassword}
+            onToggleShow={() => setShowCurrentPassword(!showCurrentPassword)}
           />
-          <button
-            type="button"
-            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-            className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-          >
-            {showCurrentPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
 
-        <div className="relative">
-          <Input
+          <PasswordField
+            id="new-password"
             label="New Password"
-            type={showNewPassword ? "text" : "password"}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Enter your new password"
-            helperText="Minimum 6 characters"
+            showPassword={showNewPassword}
+            onToggleShow={() => setShowNewPassword(!showNewPassword)}
+            error={validationErrors.newPassword}
           />
-          <button
-            type="button"
-            onClick={() => setShowNewPassword(!showNewPassword)}
-            className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-          >
-            {showNewPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
 
-        <div className="relative">
-          <Input
+          <PasswordField
+            id="confirm-password"
             label="Confirm New Password"
-            type={showConfirmPassword ? "text" : "password"}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Confirm your new password"
+            showPassword={showConfirmPassword}
+            onToggleShow={() => setShowConfirmPassword(!showConfirmPassword)}
+            error={validationErrors.confirmPassword}
           />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-          >
-            {showConfirmPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
 
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            loading={isChangingPassword}
-            disabled={!currentPassword || !newPassword || !confirmPassword}
-            className="flex items-center"
-          >
-            <Lock className="h-4 w-4 mr-2" />
-            Change Password
-          </Button>
-        </div>
-      </form>
-    </div>
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              loading={isChangingPassword}
+              disabled={
+                !currentPassword ||
+                !newPassword ||
+                !confirmPassword ||
+                Object.keys(validationErrors).length > 0
+              }
+              className="flex items-center"
+            >
+              <Lock className="h-4 w-4 mr-2" />
+              Change Password
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 

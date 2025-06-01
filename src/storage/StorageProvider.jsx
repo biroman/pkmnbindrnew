@@ -1,34 +1,41 @@
 /**
- * Storage Provider - Unified Storage Interface
+ * Storage Provider Context
  *
- * This provider automatically switches between IndexedDB (anonymous users)
- * and Firebase (authenticated users) while providing a consistent API.
+ * Provides unified storage interface that automatically switches between
+ * IndexedDB (anonymous users) and Firebase (authenticated users).
  */
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { indexedDBAdapter } from "./adapters/indexedDBAdapter";
-import { firebaseAdapter } from "./adapters/firebaseAdapter";
-import { STORAGE_TYPES } from "./adapters/storageInterface";
+// Import firebaseAdapter when it's implemented
+// import { firebaseAdapter } from "./adapters/firebaseAdapter";
 
+// Create storage context
 const StorageContext = createContext(null);
 
-export const useStorage = () => {
-  const context = useContext(StorageContext);
-  if (!context) {
-    throw new Error("useStorage must be used within a StorageProvider");
-  }
-  return context;
+// Mock Firebase adapter for now (Phase 0/1)
+const mockFirebaseAdapter = {
+  // Will be replaced with actual Firebase adapter in Phase 4
+  getBinders: async () => [],
+  createBinder: async () => null,
+  updateBinder: async () => null,
+  deleteBinder: async () => false,
+  getBinderCards: async () => [],
+  addCardToBinder: async () => null,
+  removeCardFromBinder: async () => false,
+  bulkAddCards: async () => 0,
+  isConnected: () => false,
+  getStorageInfo: () => ({ type: "firebase", isConnected: false }),
 };
 
 export const StorageProvider = ({ children }) => {
-  const { user, isLoading: authLoading } = useAuth();
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { user } = useAuth();
   const [currentAdapter, setCurrentAdapter] = useState(null);
-  const [storageType, setStorageType] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState(null);
 
-  // Initialize storage adapter based on auth state
+  // Initialize storage adapter based on user authentication
   useEffect(() => {
     const initializeStorage = async () => {
       try {
@@ -36,207 +43,233 @@ export const StorageProvider = ({ children }) => {
         setIsInitialized(false);
 
         if (user) {
-          // User is authenticated - use Firebase
-          firebaseAdapter.setUserId(user.uid);
-          setCurrentAdapter(firebaseAdapter);
-          setStorageType(STORAGE_TYPES.FIREBASE);
+          // Use Firebase for authenticated users
+          console.log("Switching to Firebase storage for authenticated user");
+          setCurrentAdapter(mockFirebaseAdapter); // Will be firebaseAdapter in Phase 4
         } else {
-          // User is not authenticated - use IndexedDB
+          // Use IndexedDB for anonymous users
+          console.log("Using IndexedDB storage for anonymous user");
           await indexedDBAdapter.init();
           setCurrentAdapter(indexedDBAdapter);
-          setStorageType(STORAGE_TYPES.INDEXEDDB);
         }
 
         setIsInitialized(true);
-      } catch (error) {
-        console.error("Storage initialization error:", error);
-        setError(error);
+      } catch (err) {
+        console.error("Storage initialization failed:", err);
+        setError(err);
 
         // Fallback to IndexedDB if Firebase fails
-        if (user && !currentAdapter) {
+        if (user) {
+          console.warn("Firebase failed, falling back to IndexedDB");
           try {
             await indexedDBAdapter.init();
             setCurrentAdapter(indexedDBAdapter);
-            setStorageType(STORAGE_TYPES.INDEXEDDB);
             setIsInitialized(true);
-            console.warn("Falling back to IndexedDB due to Firebase error");
-          } catch (fallbackError) {
-            console.error("IndexedDB fallback also failed:", fallbackError);
+          } catch (fallbackErr) {
+            console.error("IndexedDB fallback also failed:", fallbackErr);
           }
         }
       }
     };
 
-    if (!authLoading) {
-      initializeStorage();
-    }
-  }, [user, authLoading]);
+    initializeStorage();
+  }, [user]);
 
-  // Storage interface methods
-  const storage = currentAdapter
-    ? {
-        // Binder Operations
-        getBinders: () => currentAdapter.getBinders(),
-        getBinder: (binderId) => currentAdapter.getBinder(binderId),
-        createBinder: (binderData) => currentAdapter.createBinder(binderData),
-        updateBinder: (binderId, updates) =>
-          currentAdapter.updateBinder(binderId, updates),
-        deleteBinder: (binderId) => currentAdapter.deleteBinder(binderId),
+  // Unified storage interface
+  const storage = {
+    // Current adapter
+    adapter: currentAdapter,
 
-        // Card Operations
-        getBinderCards: (binderId) => currentAdapter.getBinderCards(binderId),
-        addCardToBinder: (binderId, cardData) =>
-          currentAdapter.addCardToBinder(binderId, cardData),
-        updateCardInBinder: (binderId, cardId, updates) =>
-          currentAdapter.updateCardInBinder?.(binderId, cardId, updates),
-        removeCardFromBinder: (binderId, cardId) =>
-          currentAdapter.removeCardFromBinder(binderId, cardId),
-        bulkAddCards: (binderId, cardsData) =>
-          currentAdapter.bulkAddCards(binderId, cardsData),
-        bulkRemoveCards: (binderId, cardIds) =>
-          currentAdapter.bulkRemoveCards?.(binderId, cardIds),
-
-        // Search Operations
-        searchCards: (query, filters) =>
-          currentAdapter.searchCards(query, filters),
-        searchBinders: (query) => currentAdapter.searchBinders(query),
-
-        // Set Completion Operations
-        getSetCompletion: (binderId, setId) =>
-          currentAdapter.getSetCompletion(binderId, setId),
-        updateSetCompletion: (binderId, setId, completionData) =>
-          currentAdapter.updateSetCompletion(binderId, setId, completionData),
-        getMissingCards: (binderId, setId) =>
-          currentAdapter.getMissingCards(binderId, setId),
-
-        // Cache Operations
-        getCachedCard: (cardId) => currentAdapter.getCachedCard(cardId),
-        setCachedCard: (cardId, cardData, ttl) =>
-          currentAdapter.setCachedCard(cardId, cardData, ttl),
-        getCachedSet: (setId) => currentAdapter.getCachedSet(setId),
-        setCachedSet: (setId, setData, ttl) =>
-          currentAdapter.setCachedSet(setId, setData, ttl),
-
-        // User Settings
-        getUserSettings: () => currentAdapter.getUserSettings(),
-        updateUserSettings: (settings) =>
-          currentAdapter.updateUserSettings(settings),
-
-        // Migration & Utility Operations
-        getAllData: () => currentAdapter.getAllData(),
-        clearAllData: () => currentAdapter.clearAllData(),
-        exportData: () => currentAdapter.exportData(),
-        importData: (data) => currentAdapter.importData(data),
-
-        // Connection & Status
-        isConnected: () => currentAdapter.isConnected(),
-        getStorageInfo: () => currentAdapter.getStorageInfo(),
-
-        // Real-time subscriptions (Firebase only)
-        subscribeToBinders: (callback) => {
-          if (currentAdapter.subscribeToBinders) {
-            return currentAdapter.subscribeToBinders(callback);
-          }
-          return () => {}; // No-op for IndexedDB
-        },
-        subscribeToBinderCards: (binderId, callback) => {
-          if (currentAdapter.subscribeToBinderCards) {
-            return currentAdapter.subscribeToBinderCards(binderId, callback);
-          }
-          return () => {}; // No-op for IndexedDB
-        },
-
-        // Storage metadata
-        storageType,
-        isOnline: user !== null,
-        canSync: user !== null,
-        adapter: currentAdapter,
-      }
-    : null;
-
-  const contextValue = {
-    storage,
+    // Initialization state
     isInitialized,
-    isLoading: authLoading || !isInitialized,
     error,
-    storageType,
-    isOnline: user !== null,
-    canSync: user !== null,
-    user,
+
+    // User type info
+    isAnonymous: !user,
+    isAuthenticated: !!user,
+    storageType: user ? "firebase" : "indexeddb",
+
+    // ===== BINDER OPERATIONS =====
+    getBinders: async () => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.getBinders();
+    },
+
+    getBinder: async (binderId) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.getBinder(binderId);
+    },
+
+    createBinder: async (binderData) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.createBinder(binderData);
+    },
+
+    updateBinder: async (binderId, updates) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.updateBinder(binderId, updates);
+    },
+
+    deleteBinder: async (binderId) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.deleteBinder(binderId);
+    },
+
+    // ===== CARD OPERATIONS =====
+    getBinderCards: async (binderId) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.getBinderCards(binderId);
+    },
+
+    addCardToBinder: async (binderId, cardData) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.addCardToBinder(binderId, cardData);
+    },
+
+    removeCardFromBinder: async (binderId, cardId) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.removeCardFromBinder(binderId, cardId);
+    },
+
+    bulkAddCards: async (binderId, cardsData) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.bulkAddCards(binderId, cardsData);
+    },
+
+    // ===== CACHE OPERATIONS =====
+    getCachedCard: async (cardId) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.getCachedCard(cardId);
+    },
+
+    setCachedCard: async (cardId, cardData, ttl) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.setCachedCard(cardId, cardData, ttl);
+    },
+
+    // ===== SEARCH OPERATIONS =====
+    searchCards: async (query, filters = {}) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.searchCards(query, filters);
+    },
+
+    searchBinders: async (query) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.searchBinders(query);
+    },
+
+    // ===== UTILITY OPERATIONS =====
+    getAllData: async () => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.getAllData();
+    },
+
+    getUserSettings: async () => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.getUserSettings();
+    },
+
+    updateUserSettings: async (settings) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.updateUserSettings(settings);
+    },
+
+    // ===== STATUS OPERATIONS =====
+    isConnected: () => {
+      return currentAdapter ? currentAdapter.isConnected() : false;
+    },
+
+    getStorageInfo: () => {
+      if (!currentAdapter) {
+        return { type: "none", isConnected: false, error: "Not initialized" };
+      }
+      return {
+        ...currentAdapter.getStorageInfo(),
+        isAnonymous: !user,
+        isAuthenticated: !!user,
+      };
+    },
+
+    // ===== MIGRATION OPERATIONS (Phase 4) =====
+    exportData: async () => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.exportData();
+    },
+
+    importData: async (data) => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.importData(data);
+    },
+
+    clearAllData: async () => {
+      if (!currentAdapter) throw new Error("Storage not initialized");
+      return await currentAdapter.clearAllData();
+    },
   };
 
+  if (!isInitialized && !error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Initializing storage...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-500 mb-4">
+            <svg
+              className="h-12 w-12 mx-auto"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 15.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            Storage Initialization Failed
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Unable to initialize storage system. Please try refreshing the page.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <StorageContext.Provider value={contextValue}>
+    <StorageContext.Provider value={storage}>
       {children}
     </StorageContext.Provider>
   );
 };
 
-/**
- * Hook for accessing storage with loading states
- */
-export const useStorageWithLoading = () => {
-  const { storage, isLoading, error } = useStorage();
-
-  return {
-    storage,
-    isLoading,
-    error,
-    isReady: !isLoading && !error && storage !== null,
-  };
-};
-
-/**
- * Hook for storage type information
- */
-export const useStorageInfo = () => {
-  const { storageType, isOnline, canSync, user } = useStorage();
-
-  return {
-    storageType,
-    isOnline,
-    canSync,
-    isGuest: !user,
-    isRegistered: !!user,
-    storageLocation: storageType === STORAGE_TYPES.FIREBASE ? "Cloud" : "Local",
-  };
-};
-
-/**
- * Higher-order component for components that require storage
- */
-export const withStorage = (Component) => {
-  return function StorageWrappedComponent(props) {
-    const { storage, isLoading, error } = useStorage();
-
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center min-h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-gray-600">Initializing storage...</span>
-        </div>
-      );
-    }
-
-    if (error || !storage) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-32 text-center">
-          <div className="text-red-600 mb-2">Storage initialization failed</div>
-          <div className="text-sm text-gray-500">
-            {error?.message || "Unknown storage error"}
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
-
-    return <Component {...props} storage={storage} />;
-  };
+// Hook to use storage context
+export const useStorage = () => {
+  const context = useContext(StorageContext);
+  if (!context) {
+    throw new Error("useStorage must be used within a StorageProvider");
+  }
+  return context;
 };
 
 export default StorageProvider;

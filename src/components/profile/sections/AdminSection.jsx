@@ -8,6 +8,7 @@ import {
   Download,
   RefreshCw,
   Activity,
+  Cog,
 } from "lucide-react";
 import {
   Card,
@@ -28,6 +29,7 @@ import {
 } from "../../ui";
 import AdminDashboard from "../AdminDashboard";
 import UserManagement from "../UserManagement";
+import SystemConfiguration from "../SystemConfiguration";
 
 const AdminSection = ({ currentUser, userProfile, isOwner }) => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -44,6 +46,12 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
       name: "User Management",
       icon: Users,
       description: "Manage users and permissions",
+    },
+    {
+      id: "configuration",
+      name: "System Config",
+      icon: Cog,
+      description: "Configure user limits, features, and system settings",
     },
     {
       id: "maintenance",
@@ -171,6 +179,8 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
           )}
 
           {activeTab === "users" && <UserManagement />}
+
+          {activeTab === "configuration" && <SystemConfiguration />}
 
           {activeTab === "maintenance" && (
             <AdminDashboard

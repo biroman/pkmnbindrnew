@@ -21,6 +21,8 @@ export {
 export { default as ThemeToggle } from "./ThemeToggle";
 export { default as RoleGuard } from "./RoleGuard";
 export { Switch } from "./Switch";
+export { Slider } from "./Slider";
+export { Separator } from "./Separator";
 
 // Radix UI Components
 export {
@@ -87,6 +89,8 @@ export {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "./Select";
+
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
 
 // Common Reusable Components
 export {

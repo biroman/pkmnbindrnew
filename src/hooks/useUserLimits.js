@@ -17,6 +17,19 @@ import {
   WARNING_THRESHOLDS,
 } from "../config/userLimits";
 
+/**
+ * Helper function to format bytes
+ */
+const formatBytes = (bytes) => {
+  if (bytes === 0) return "0 Bytes";
+
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
 export const useUserLimits = () => {
   const { user } = useAuth();
 
@@ -36,6 +49,10 @@ export const useUserLimits = () => {
   // Limit checking functions
   const canCreateBinder = useCallback(
     (currentBinderCount) => {
+      // If limits are effectively unlimited, always allow
+      if (limits.maxBinders === Number.MAX_SAFE_INTEGER) {
+        return true;
+      }
       return currentBinderCount < limits.maxBinders;
     },
     [limits.maxBinders]
@@ -43,6 +60,10 @@ export const useUserLimits = () => {
 
   const canAddCard = useCallback(
     (currentCardCount) => {
+      // If limits are effectively unlimited, always allow
+      if (limits.maxCardsPerBinder === Number.MAX_SAFE_INTEGER) {
+        return true;
+      }
       return currentCardCount < limits.maxCardsPerBinder;
     },
     [limits.maxCardsPerBinder]
@@ -60,6 +81,12 @@ export const useUserLimits = () => {
     (type, currentCount) => {
       const limit =
         type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+
+      // If unlimited, return a large number for display purposes
+      if (limit === Number.MAX_SAFE_INTEGER) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+
       return Math.max(0, limit - currentCount);
     },
     [limits]
@@ -70,6 +97,12 @@ export const useUserLimits = () => {
     (type, currentCount) => {
       const limit =
         type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+
+      // If unlimited, always return 0% usage
+      if (limit === Number.MAX_SAFE_INTEGER) {
+        return 0;
+      }
+
       return Math.round((currentCount / limit) * 100);
     },
     [limits]
@@ -78,6 +111,14 @@ export const useUserLimits = () => {
   // Check if approaching limits
   const isApproachingLimit = useCallback(
     (type, currentCount, threshold = null) => {
+      const limit =
+        type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+
+      // If unlimited, never approaching limit
+      if (limit === Number.MAX_SAFE_INTEGER) {
+        return false;
+      }
+
       const defaultThreshold =
         type === "binders"
           ? WARNING_THRESHOLDS.BINDER_WARNING
@@ -86,15 +127,21 @@ export const useUserLimits = () => {
       const usedThreshold = threshold || defaultThreshold;
       return getUsagePercentage(type, currentCount) >= usedThreshold;
     },
-    [getUsagePercentage]
+    [getUsagePercentage, limits]
   );
 
   // Get appropriate warning message
   const getWarningMessage = useCallback(
     (type, currentCount) => {
-      const percentage = getUsagePercentage(type, currentCount);
       const limit =
         type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+
+      // If unlimited, no warning messages for capacity
+      if (limit === Number.MAX_SAFE_INTEGER) {
+        return null;
+      }
+
+      const percentage = getUsagePercentage(type, currentCount);
 
       if (percentage >= 100) {
         return getLimitMessage(
@@ -128,7 +175,21 @@ export const useUserLimits = () => {
       };
 
       const messageKey = featureMap[featureName] || featureName;
-      return getLimitMessage("FEATURE_LOCKED")[messageKey];
+
+      // Add safety checks for LIMIT_MESSAGES.FEATURE_LOCKED
+      try {
+        const featureLockMessages = getLimitMessage("FEATURE_LOCKED");
+        if (featureLockMessages && typeof featureLockMessages === "object") {
+          return (
+            featureLockMessages[messageKey] ||
+            `Feature '${featureName}' requires registration.`
+          );
+        }
+        return `Feature '${featureName}' requires registration.`;
+      } catch (error) {
+        console.warn("Error getting feature lock message:", error);
+        return `Feature '${featureName}' requires registration.`;
+      }
     },
     [canUseFeature]
   );
@@ -208,6 +269,13 @@ export const useUserLimits = () => {
               "binders",
               currentCounts.binders
             );
+          } else if (
+            userInfo.isGuest &&
+            currentCounts.binders > 0 &&
+            currentCounts.binders % 5 === 0
+          ) {
+            // For guests with unlimited binders, show upgrade prompts every 5 binders
+            result.upgradeIncentive = getUpgradeIncentives("onStorageFull");
           }
           break;
 
@@ -218,6 +286,13 @@ export const useUserLimits = () => {
             result.upgradeIncentive = getUpgradeIncentives("onCardLimit");
           } else if (isApproachingLimit("cards", currentCounts.cards)) {
             result.warning = getWarningMessage("cards", currentCounts.cards);
+          } else if (
+            userInfo.isGuest &&
+            currentCounts.cards > 0 &&
+            currentCounts.cards % 20 === 0
+          ) {
+            // For guests with unlimited cards, show upgrade prompts every 20 cards
+            result.upgradeIncentive = getUpgradeIncentives("onStorageFull");
           }
           break;
 
@@ -251,6 +326,7 @@ export const useUserLimits = () => {
       getFeatureLockMessage,
       getUpgradeIncentives,
       isApproachingLimit,
+      userInfo.isGuest,
     ]
   );
 
@@ -291,19 +367,6 @@ export const useUserLimits = () => {
 };
 
 /**
- * Helper function to format bytes
- */
-const formatBytes = (bytes) => {
-  if (bytes === 0) return "0 Bytes";
-
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-};
-
-/**
  * Hook for specific limit checks
  */
 export const useBinderLimits = (currentBinderCount) => {
@@ -314,13 +377,19 @@ export const useBinderLimits = (currentBinderCount) => {
     isApproachingLimit,
     getWarningMessage,
     validateAction,
+    limits,
   } = useUserLimits();
+
+  const isUnlimited = limits.maxBinders === Number.MAX_SAFE_INTEGER;
 
   return {
     canCreate: canCreateBinder(currentBinderCount),
-    remaining: getRemainingCapacity("binders", currentBinderCount),
+    remaining: isUnlimited
+      ? "Unlimited"
+      : getRemainingCapacity("binders", currentBinderCount),
     usagePercentage: getUsagePercentage("binders", currentBinderCount),
     isApproaching: isApproachingLimit("binders", currentBinderCount),
+    isUnlimited,
     warningMessage: getWarningMessage("binders", currentBinderCount),
     validation: validateAction("createBinder", { binders: currentBinderCount }),
   };
@@ -337,13 +406,19 @@ export const useCardLimits = (currentCardCount) => {
     isApproachingLimit,
     getWarningMessage,
     validateAction,
+    limits,
   } = useUserLimits();
+
+  const isUnlimited = limits.maxCardsPerBinder === Number.MAX_SAFE_INTEGER;
 
   return {
     canAdd: canAddCard(currentCardCount),
-    remaining: getRemainingCapacity("cards", currentCardCount),
+    remaining: isUnlimited
+      ? "Unlimited"
+      : getRemainingCapacity("cards", currentCardCount),
     usagePercentage: getUsagePercentage("cards", currentCardCount),
     isApproaching: isApproachingLimit("cards", currentCardCount),
+    isUnlimited,
     warningMessage: getWarningMessage("cards", currentCardCount),
     validation: validateAction("addCard", { cards: currentCardCount }),
   };

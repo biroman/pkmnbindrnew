@@ -2,6 +2,12 @@ import { useAuth } from "../../contexts/AuthContext";
 import ThemeToggle from "../ui/ThemeToggle";
 import Button from "../ui/Button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui";
+import {
   Menu,
   X,
   LogOut,
@@ -13,6 +19,11 @@ import {
   BarChart3,
   Folder,
   Plus,
+  LogIn,
+  UserPlus,
+  Lock,
+  HardDrive,
+  Cloud,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, NavLink, Link } from "react-router-dom";
@@ -25,26 +36,39 @@ const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Check if user is on binder page
+  const isOnBinderPage = location.pathname.startsWith("/app/binder");
+
+  // Primary action for all users
+  const primaryAction = {
+    name: currentUser ? "Create Binder" : "Start Creating",
+    href: "/app/binder",
+    icon: Plus,
+    isPrimary: true,
+  };
+
+  // All navigation items (some restricted for anonymous users)
   const navigationItems = [
-    {
-      name: "Create Binder",
-      href: "/app/create-binder",
-      icon: Plus,
-    },
     {
       name: "Dashboard",
       href: "/app/dashboard",
       icon: Home,
+      authOnly: true,
+      tooltip: "Sign up to access your personal dashboard",
     },
     {
-      name: "Binders",
+      name: "My Binders",
       href: "/app/collections",
       icon: Folder,
+      authOnly: true,
+      tooltip: "Sign up to manage multiple binders and collections",
     },
     {
       name: "Statistics",
       href: "/app/stats",
       icon: BarChart3,
+      authOnly: true,
+      tooltip: "Sign up to get your own collection statistics",
     },
   ];
 
@@ -52,6 +76,7 @@ const Header = () => {
     try {
       await logout();
       setIsDropdownOpen(false);
+      navigate("/under-development");
     } catch (error) {
       console.error("Failed to log out:", error);
     }
@@ -60,6 +85,14 @@ const Header = () => {
   const handleSettingsClick = () => {
     setIsDropdownOpen(false);
     navigate("/app/profile");
+  };
+
+  const handleSignIn = () => {
+    navigate("/auth?mode=login");
+  };
+
+  const handleSignUp = () => {
+    navigate("/auth?mode=signup");
   };
 
   const toggleDropdown = () => {
@@ -90,181 +123,345 @@ const Header = () => {
   const photoURL = userProfile?.photoURL || currentUser?.photoURL;
 
   return (
-    <header className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 relative z-30">
-      <div className="w-full flex justify-between items-center h-16">
-        {/* Left side - Logo + Title */}
-        <div className="flex items-center">
-          {/* Mobile hamburger menu - for navigation */}
-          <button
-            onClick={toggleMobileMenu}
-            className="lg:hidden ml-4 mr-2 p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            aria-label="Toggle mobile navigation"
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </button>
+    <TooltipProvider>
+      <header className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 relative z-30">
+        <div className="w-full flex justify-between items-center h-16">
+          {/* Left side - Logo + Title */}
+          <div className="flex items-center">
+            {/* Mobile hamburger menu - for navigation */}
+            <button
+              onClick={toggleMobileMenu}
+              className="lg:hidden ml-4 mr-2 p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Toggle mobile navigation"
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
 
-          {/* Logo + Title */}
-          <div className="flex items-center ml-2 lg:ml-6">
-            <div className="flex-shrink-0 mr-3">
-              <img
-                src="/logo.png"
-                alt="Pokemon Binder Logo"
-                className="h-7 w-7 lg:h-20 lg:w-20 object-contain"
-                onError={(e) => {
-                  // Fallback to ShieldCheck icon if logo fails to load
-                  e.target.style.display = "none";
-                  e.target.nextElementSibling.style.display = "block";
-                }}
-              />
-              <ShieldCheck className="h-7 w-7 lg:h-8 lg:w-8 text-blue-600 dark:text-blue-400 hidden" />
+            {/* Logo + Title */}
+            <div className="flex items-center ml-2 lg:ml-6">
+              <div className="flex-shrink-0 mr-3">
+                <img
+                  src="/logo.png"
+                  alt="Pokemon Binder Logo"
+                  className="h-7 w-7 lg:h-20 lg:w-20 object-contain"
+                  onError={(e) => {
+                    // Fallback to ShieldCheck icon if logo fails to load
+                    e.target.style.display = "none";
+                    e.target.nextElementSibling.style.display = "block";
+                  }}
+                />
+                <ShieldCheck className="h-7 w-7 lg:h-8 lg:w-8 text-blue-600 dark:text-blue-400 hidden" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Center - Desktop Navigation */}
-        <nav className="hidden lg:flex items-center space-x-8">
-          {navigationItems.map((item) => {
-            const IconComponent = item.icon;
-            const isActive = location.pathname === item.href;
-            return (
-              <NavLink
-                key={item.name}
-                to={item.href}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                  isActive
-                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                    : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
-                }`}
-              >
-                <IconComponent className="h-4 w-4" />
-                <span>{item.name}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+          {/* Center - Desktop Navigation */}
+          <nav className="hidden lg:flex items-center space-x-8">
+            {/* Primary Action */}
+            <NavLink
+              to={primaryAction.href}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
+                location.pathname === primaryAction.href
+                  ? "bg-blue-700"
+                  : "hover:bg-blue-700"
+              }`}
+            >
+              <Plus className="h-4 w-4" />
+              <span>{primaryAction.name}</span>
+            </NavLink>
 
-        {/* Right side - Theme toggle + User Profile Dropdown */}
-        <div className="flex items-center space-x-2 sm:space-x-4 px-4 sm:px-6 lg:px-8">
-          <ThemeToggle size="sm" />
-
-          {currentUser && !loading && (
-            <div className="relative" ref={dropdownRef}>
-              {/* Profile Button */}
-              <button
-                onClick={toggleDropdown}
-                className="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                aria-label="User menu"
-              >
-                {/* Profile image/avatar */}
-                {photoURL ? (
-                  <img
-                    src={photoURL}
-                    alt="Profile"
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                      {displayName.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                {/* Dropdown indicator - hidden on mobile */}
-                <ChevronDown
-                  className={`hidden sm:block h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform ${
-                    isDropdownOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {/* Dropdown Menu */}
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
-                  {/* User Info Section */}
-                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p
-                          className={`text-sm font-bold ${
-                            isOwner()
-                              ? "text-purple-600 dark:text-purple-400"
-                              : "text-gray-900 dark:text-white"
-                          }`}
-                        >
-                          {displayName}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {email}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Menu Items */}
-                  <div className="py-1">
-                    <button
-                      onClick={handleSettingsClick}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <Settings className="h-4 w-4 mr-3" />
-                      Settings
-                    </button>
-
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <LogOut className="h-4 w-4 mr-3" />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {loading && (
-            <div className="flex items-center space-x-3">
-              <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-              </div>
-              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Navigation Menu */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <nav className="px-4 py-2 space-y-1">
+            {/* All Navigation Items */}
             {navigationItems.map((item) => {
               const IconComponent = item.icon;
               const isActive = location.pathname === item.href;
-              return (
+              const isDisabled = item.authOnly && !currentUser;
+
+              const navItem = (
                 <NavLink
                   key={item.name}
                   to={item.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                    isActive
-                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                      : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                    isDisabled
+                      ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                      : isActive
+                      ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
                   }`}
+                  onClick={isDisabled ? (e) => e.preventDefault() : undefined}
                 >
-                  <IconComponent className="h-5 w-5" />
+                  <IconComponent className="h-4 w-4" />
                   <span>{item.name}</span>
+                  {isDisabled && <Lock className="h-3 w-3 ml-1 opacity-50" />}
                 </NavLink>
               );
+
+              // Wrap disabled items with tooltip
+              if (isDisabled && item.tooltip) {
+                return (
+                  <Tooltip key={item.name}>
+                    <TooltipTrigger asChild>{navItem}</TooltipTrigger>
+                    <TooltipContent>
+                      <p>{item.tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return navItem;
             })}
           </nav>
+
+          {/* Right side - Theme toggle + User Profile/Auth */}
+          <div className="flex items-center space-x-2 sm:space-x-4 px-4 sm:px-6 lg:px-8">
+            <ThemeToggle size="sm" />
+
+            {/* Authenticated User - Profile Dropdown */}
+            {currentUser && !loading && (
+              <div className="relative" ref={dropdownRef}>
+                {/* Profile Button */}
+                <button
+                  onClick={toggleDropdown}
+                  className="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="User menu"
+                >
+                  {/* Profile image/avatar */}
+                  {photoURL ? (
+                    <img
+                      src={photoURL}
+                      alt="Profile"
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                        {displayName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {/* Dropdown indicator - hidden on mobile */}
+                  <ChevronDown
+                    className={`hidden sm:block h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform ${
+                      isDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {/* Dropdown Menu */}
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                    {/* User Info Section */}
+                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p
+                            className={`text-sm font-bold ${
+                              isOwner()
+                                ? "text-purple-600 dark:text-purple-400"
+                                : "text-gray-900 dark:text-white"
+                            }`}
+                          >
+                            {displayName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {email}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="py-1">
+                      <button
+                        onClick={handleSettingsClick}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <Settings className="h-4 w-4 mr-3" />
+                        Settings
+                      </button>
+
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4 mr-3" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Anonymous User - Auth Buttons */}
+            {!currentUser && !loading && (
+              <div className="flex items-center space-x-2">
+                <Button
+                  onClick={handleSignIn}
+                  variant="outline"
+                  size="sm"
+                  className="hidden sm:flex items-center"
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
+                <Button
+                  onClick={handleSignUp}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Sign Up
+                </Button>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {loading && (
+              <div className="flex items-center space-x-3">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                </div>
+                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </header>
+
+        {/* Mobile Navigation Menu */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <nav className="px-4 py-2 space-y-1">
+              {/* Primary Action */}
+              <NavLink
+                to={primaryAction.href}
+                onClick={(e) => {
+                  if (e.target.tagName === "A") {
+                    setIsMobileMenuOpen(false);
+                  }
+                }}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
+                  location.pathname === primaryAction.href
+                    ? "bg-blue-700"
+                    : "hover:bg-blue-700"
+                }`}
+              >
+                <Plus className="h-5 w-5" />
+                <span>{primaryAction.name}</span>
+              </NavLink>
+
+              {/* All Navigation Items */}
+              {navigationItems.map((item) => {
+                const IconComponent = item.icon;
+                const isActive = location.pathname === item.href;
+                const isDisabled = item.authOnly && !currentUser;
+
+                const navItem = (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    onClick={(e) => {
+                      if (isDisabled) {
+                        e.preventDefault();
+                      } else {
+                        setIsMobileMenuOpen(false);
+                      }
+                    }}
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      isDisabled
+                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : isActive
+                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                        : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    <IconComponent className="h-5 w-5" />
+                    <span>{item.name}</span>
+                    {isDisabled && <Lock className="h-3 w-3 ml-1 opacity-50" />}
+                  </NavLink>
+                );
+
+                // Wrap disabled items with tooltip
+                if (isDisabled && item.tooltip) {
+                  return (
+                    <Tooltip key={item.name}>
+                      <TooltipTrigger asChild>{navItem}</TooltipTrigger>
+                      <TooltipContent>
+                        <p>{item.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+
+                return navItem;
+              })}
+
+              {/* Mobile Auth Buttons for Anonymous Users */}
+              {!currentUser && !loading && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2 space-y-1">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsMobileMenuOpen(false);
+                      handleSignIn();
+                    }}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200 w-full"
+                  >
+                    <LogIn className="h-5 w-5" />
+                    <span>Sign In</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsMobileMenuOpen(false);
+                      handleSignUp();
+                    }}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 w-full"
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    <span>Sign Up</span>
+                  </button>
+                </div>
+              )}
+            </nav>
+          </div>
+        )}
+
+        {/* Guest Notification Banner - appears on binder page for anonymous users */}
+        {!currentUser && isOnBinderPage && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-2 text-amber-800 dark:text-amber-200">
+                  <HardDrive className="h-4 w-4" />
+                  <span>
+                    <strong>Guest mode:</strong> Your binder is saved locally.
+                    <span className="hidden sm:inline">
+                      {" "}
+                      Sign up to sync across devices and share with friends.
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={handleSignUp}
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white dark:border-amber-400 dark:text-amber-300"
+                  >
+                    <Cloud className="h-3 w-3 mr-1" />
+                    Upgrade
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+    </TooltipProvider>
   );
 };
 

@@ -92,7 +92,7 @@ const UnderDevelopment = () => {
               Progress
             </h3>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full w-2/5 animate-pulse"></div>
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full w-3/5 animate-pulse"></div>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-300">
               60% Complete

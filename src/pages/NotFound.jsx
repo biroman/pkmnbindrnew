@@ -17,7 +17,7 @@ const NotFound = () => {
           Oops! The page you're looking for doesn't exist. It might have been
           moved or deleted.
         </p>
-        <Link to="/dashboard">
+        <Link to="/app/dashboard">
           <Button variant="primary" size="lg">
             Return to Dashboard
           </Button>

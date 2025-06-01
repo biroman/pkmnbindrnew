@@ -5,20 +5,42 @@
  * These limits encourage user registration while still providing value to anonymous users.
  */
 
+// Configuration flags for easy limit management
+export const LIMIT_ENFORCEMENT = {
+  // Set to false to disable specific limits for guests
+  ENFORCE_BINDER_LIMITS: false, // Currently disabled - guests have unlimited binders
+  ENFORCE_CARD_LIMITS: false, // Currently disabled - guests have unlimited cards per binder
+  ENFORCE_STORAGE_WARNINGS: true, // Keep storage warnings active
+  ENFORCE_FEATURE_LOCKS: true, // Keep premium features locked for guests
+
+  // Easy toggle for future limit enforcement
+  STRICT_MODE: false, // Set to true to enforce all limits
+};
+
 export const USER_LIMITS = {
   GUEST: {
-    // Binder limits
-    maxBinders: 3,
-    maxCardsPerBinder: 50,
+    // Binder limits - Currently unlimited (stored locally)
+    maxBinders: LIMIT_ENFORCEMENT.ENFORCE_BINDER_LIMITS
+      ? 3
+      : Number.MAX_SAFE_INTEGER,
+    maxCardsPerBinder: LIMIT_ENFORCEMENT.ENFORCE_CARD_LIMITS
+      ? 50
+      : Number.MAX_SAFE_INTEGER,
 
-    // Feature access
+    // Legacy limits (for easy restoration if needed)
+    _legacyLimits: {
+      maxBinders: 3,
+      maxCardsPerBinder: 50,
+    },
+
+    // Feature access - These remain restricted for guests
     canShare: false,
     canExport: false,
     canSync: false,
     canImport: false,
     canCreateSharedLinks: false,
 
-    // Advanced features
+    // Advanced features - Restricted for guests
     canUseSetCompletion: false,
     canTrackMissingCards: false,
     canCreateCustomLayouts: false,
@@ -27,7 +49,7 @@ export const USER_LIMITS = {
     // UI preferences
     showUpgradeBanner: true,
     showFeatureLockMessages: true,
-    showLimitWarnings: true,
+    showLimitWarnings: LIMIT_ENFORCEMENT.ENFORCE_STORAGE_WARNINGS, // Only show storage warnings
 
     // Storage
     storageType: "local",
@@ -38,7 +60,9 @@ export const USER_LIMITS = {
 
     // Messaging
     upgradePrompts: {
-      onLimitReached: true,
+      onLimitReached:
+        LIMIT_ENFORCEMENT.ENFORCE_BINDER_LIMITS ||
+        LIMIT_ENFORCEMENT.ENFORCE_CARD_LIMITS,
       onFeatureAttempt: true,
       onShareAttempt: true,
       onExportAttempt: true,
@@ -124,15 +148,17 @@ export const FEATURE_FLAGS = {
  */
 export const LIMIT_MESSAGES = {
   BINDER_LIMIT_REACHED: {
-    guest:
-      "You've reached the limit of 3 binders for guest users. Sign up to create up to 25 binders!",
+    guest: LIMIT_ENFORCEMENT.ENFORCE_BINDER_LIMITS
+      ? "You've reached the limit of 3 binders for guest users. Sign up to create up to 25 binders!"
+      : "Local storage is getting full. Sign up for unlimited cloud storage and sync across devices!",
     registered:
       "You've reached your binder limit of 25. Consider organizing your existing binders.",
   },
 
   CARD_LIMIT_REACHED: {
-    guest:
-      "This binder has reached the 50 card limit for guest users. Sign up for binders with up to 400 cards!",
+    guest: LIMIT_ENFORCEMENT.ENFORCE_CARD_LIMITS
+      ? "This binder has reached the 50 card limit for guest users. Sign up for binders with up to 400 cards!"
+      : "This binder is getting large. Sign up for cloud storage and better organization features!",
     registered:
       "This binder has reached the 400 card limit. Consider creating a new binder for additional cards.",
   },
@@ -164,27 +190,27 @@ export const WARNING_THRESHOLDS = {
  * Upgrade incentives configuration
  */
 export const UPGRADE_INCENTIVES = {
-  // Primary benefits shown in banners
+  // Primary benefits shown in banners - Updated for unlimited local storage
   PRIMARY_BENEFITS: [
-    "Unlimited binders (up to 25)",
-    "400 cards per binder",
+    "Unlimited cloud storage",
+    "Sync across all devices",
     "Share collections with friends",
     "Export card lists",
-    "Cloud sync & backup",
+    "Advanced organization tools",
     "Set completion tracking",
   ],
 
-  // Context-specific incentives
+  // Context-specific incentives - Updated messaging
   CONTEXTUAL_INCENTIVES: {
     onBinderLimit: [
-      "Create up to 25 binders",
-      "Organize larger collections",
-      "Cloud backup & sync",
+      "Unlimited cloud storage",
+      "Sync across devices",
+      "Never lose your data",
     ],
     onCardLimit: [
-      "400 cards per binder",
-      "Unlimited storage",
-      "Advanced organization",
+      "Advanced organization tools",
+      "Cloud backup & sync",
+      "Better collection management",
     ],
     onShareAttempt: [
       "Share binders with friends",
@@ -196,11 +222,16 @@ export const UPGRADE_INCENTIVES = {
       "Multiple export formats",
       "Print-friendly layouts",
     ],
+    onStorageFull: [
+      "Unlimited cloud storage",
+      "Automatic device sync",
+      "Never worry about storage limits",
+    ],
   },
 
   // Call-to-action buttons
   CTA_TEXT: {
-    primary: "Sign Up Free",
+    primary: "Get Cloud Storage",
     secondary: "Learn More",
     contextual: "Upgrade Now",
   },
@@ -290,49 +321,62 @@ export const getLimitMessage = (limitType, userType = "guest") => {
 export const checkLimitWarnings = (user, binderCount, cardCounts = {}) => {
   const limits = getUserLimits(user);
   const warnings = [];
+  const isGuest = !user;
 
-  // Check binder limit
-  const binderPercentage = (binderCount / limits.maxBinders) * 100;
-  if (binderPercentage >= WARNING_THRESHOLDS.BINDER_WARNING) {
-    warnings.push({
-      type: "binder",
-      level: binderPercentage >= 100 ? "error" : "warning",
-      current: binderCount,
-      limit: limits.maxBinders,
-      percentage: Math.round(binderPercentage),
-      message:
-        binderPercentage >= 100
-          ? getLimitMessage(
-              "BINDER_LIMIT_REACHED",
-              user ? "registered" : "guest"
-            )
-          : `You're using ${Math.round(
-              binderPercentage
-            )}% of your binder limit`,
-    });
-  }
-
-  // Check card limits for each binder
-  Object.entries(cardCounts).forEach(([binderId, count]) => {
-    const cardPercentage = (count / limits.maxCardsPerBinder) * 100;
-    if (cardPercentage >= WARNING_THRESHOLDS.CARD_WARNING) {
+  // Only check binder limits if enforcement is enabled (or user is registered)
+  if (
+    !isGuest ||
+    LIMIT_ENFORCEMENT.ENFORCE_BINDER_LIMITS ||
+    LIMIT_ENFORCEMENT.STRICT_MODE
+  ) {
+    const binderPercentage = (binderCount / limits.maxBinders) * 100;
+    if (binderPercentage >= WARNING_THRESHOLDS.BINDER_WARNING) {
       warnings.push({
-        type: "card",
-        binderId,
-        level: cardPercentage >= 100 ? "error" : "warning",
-        current: count,
-        limit: limits.maxCardsPerBinder,
-        percentage: Math.round(cardPercentage),
+        type: "binder",
+        level: binderPercentage >= 100 ? "error" : "warning",
+        current: binderCount,
+        limit: limits.maxBinders,
+        percentage: Math.round(binderPercentage),
         message:
-          cardPercentage >= 100
+          binderPercentage >= 100
             ? getLimitMessage(
-                "CARD_LIMIT_REACHED",
+                "BINDER_LIMIT_REACHED",
                 user ? "registered" : "guest"
               )
-            : `Binder ${binderId} is ${Math.round(cardPercentage)}% full`,
+            : `You're using ${Math.round(
+                binderPercentage
+              )}% of your binder limit`,
       });
     }
-  });
+  }
+
+  // Only check card limits if enforcement is enabled (or user is registered)
+  if (
+    !isGuest ||
+    LIMIT_ENFORCEMENT.ENFORCE_CARD_LIMITS ||
+    LIMIT_ENFORCEMENT.STRICT_MODE
+  ) {
+    Object.entries(cardCounts).forEach(([binderId, count]) => {
+      const cardPercentage = (count / limits.maxCardsPerBinder) * 100;
+      if (cardPercentage >= WARNING_THRESHOLDS.CARD_WARNING) {
+        warnings.push({
+          type: "card",
+          binderId,
+          level: cardPercentage >= 100 ? "error" : "warning",
+          current: count,
+          limit: limits.maxCardsPerBinder,
+          percentage: Math.round(cardPercentage),
+          message:
+            cardPercentage >= 100
+              ? getLimitMessage(
+                  "CARD_LIMIT_REACHED",
+                  user ? "registered" : "guest"
+                )
+              : `Binder ${binderId} is ${Math.round(cardPercentage)}% full`,
+        });
+      }
+    });
+  }
 
   return warnings;
 };

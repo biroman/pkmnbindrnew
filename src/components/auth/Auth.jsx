@@ -1,15 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
 import ThemeToggle from "../ui/ThemeToggle";
 import { BookOpen, ChartBar, Search, Share } from "lucide-react";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  // Initialize mode based on URL parameter
+  const initialMode = searchParams.get("mode");
+  const [isLogin, setIsLogin] = useState(initialMode !== "signup");
+
+  // Update URL when mode changes
   const toggleMode = () => {
-    setIsLogin((prev) => !prev);
+    setIsLogin((prev) => {
+      const newIsLogin = !prev;
+      // Update URL params to reflect the new mode
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set("mode", newIsLogin ? "login" : "signup");
+      setSearchParams(newParams);
+      return newIsLogin;
+    });
   };
+
+  // Listen to URL changes (e.g., when user navigates with browser back/forward)
+  useEffect(() => {
+    const mode = searchParams.get("mode");
+    setIsLogin(mode !== "signup");
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 transition-colors duration-500">

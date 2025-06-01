@@ -1,8 +1,10 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 
 // Route protection components
 import ProtectedRoute from "../components/routing/ProtectedRoute";
+import AppRoute from "../components/routing/AppRoute";
+import SmartRoute from "../components/routing/SmartRoute";
 import PublicRoute from "../components/routing/PublicRoute";
 
 // Layout components
@@ -11,9 +13,11 @@ import AppLayout from "../components/layout/AppLayout";
 // EAGER LOAD - Core pages for instant access (no loading delay)
 import WelcomeDashboard from "../components/dashboard/WelcomeDashboard";
 import Collections from "../pages/Collections";
+import Binder from "../pages/Binder";
 import Collection from "../pages/Collection";
 import AddCard from "../pages/AddCard";
 import Statistics from "../pages/Statistics";
+import Landing from "../pages/Landing";
 
 // LAZY LOAD - Less frequently accessed pages
 const Auth = lazy(() => import("../components/auth/Auth"));
@@ -22,6 +26,12 @@ const Wishlist = lazy(() => import("../pages/Wishlist"));
 const Profile = lazy(() => import("../pages/Profile"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const UnderDevelopment = lazy(() => import("../pages/UnderDevelopment"));
+
+// Demo components for development
+const AnonymousDemo = lazy(() =>
+  import("../components/anonymous/AnonymousDemo")
+);
+const SimpleTest = lazy(() => import("../components/anonymous/SimpleTest"));
 
 // Improved loading component for Suspense
 const PageLoader = () => (
@@ -42,9 +52,15 @@ const LazyRoute = ({ children }) => (
 
 // Router configuration
 export const router = createBrowserRouter([
-  // Landing page - Keep lazy (not frequently accessed)
+  // Root redirects to under development for development phase
   {
     path: "/",
+    element: <Navigate to="/under-development" replace />,
+  },
+
+  // Under development page (keep for reference)
+  {
+    path: "/under-development",
     element: (
       <LazyRoute>
         <UnderDevelopment />
@@ -74,19 +90,39 @@ export const router = createBrowserRouter([
     ),
   },
 
-  // Protected routes (require authentication) - accessible via direct URLs
+  // Demo routes for development
+  {
+    path: "/demo/anonymous",
+    element: (
+      <LazyRoute>
+        <AnonymousDemo />
+      </LazyRoute>
+    ),
+  },
+
+  // Simple test route
+  {
+    path: "/test/simple",
+    element: (
+      <LazyRoute>
+        <SimpleTest />
+      </LazyRoute>
+    ),
+  },
+
+  // App routes (allow both authenticated and anonymous users)
   {
     path: "/app",
     element: (
-      <ProtectedRoute>
+      <AppRoute>
         <AppLayout />
-      </ProtectedRoute>
+      </AppRoute>
     ),
     children: [
-      // Dashboard - EAGER LOADED (instant access)
+      // Smart routing: authenticated users → dashboard, anonymous users → collections
       {
         index: true,
-        element: <WelcomeDashboard />,
+        element: <SmartRoute />,
       },
       {
         path: "dashboard",
@@ -105,10 +141,24 @@ export const router = createBrowserRouter([
         element: <AddCard />,
       },
 
-      // Collections/Binders - EAGER LOADED (main feature)
+      // Collections/Binders - PROTECTED (authenticated users only)
       {
         path: "collections",
-        element: <Collections />,
+        element: (
+          <ProtectedRoute>
+            <Collections />
+          </ProtectedRoute>
+        ),
+      },
+
+      // Individual Binder Create/Edit - EAGER LOADED (core feature)
+      {
+        path: "binder",
+        element: <Binder />,
+      },
+      {
+        path: "binder/:binderId",
+        element: <Binder />,
       },
 
       // Statistics - EAGER LOADED (accessed from dashboard)
@@ -128,6 +178,32 @@ export const router = createBrowserRouter([
       },
 
       // Profile - LAZY LOADED (less frequent)
+      {
+        path: "profile",
+        element: (
+          <LazyRoute>
+            <Profile />
+          </LazyRoute>
+        ),
+      },
+
+      // Landing page - available for reference during development
+      {
+        path: "landing",
+        element: <Landing />,
+      },
+    ],
+  },
+
+  // Admin routes (still require authentication)
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
+    children: [
       {
         path: "profile",
         element: (

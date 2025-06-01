@@ -1,5 +1,6 @@
-// Core components
+// Core UI Components
 export { default as Button } from "./Button";
+export { default as Badge } from "./Badge";
 export {
   Card,
   CardHeader,
@@ -21,7 +22,7 @@ export { default as ThemeToggle } from "./ThemeToggle";
 export { default as RoleGuard } from "./RoleGuard";
 export { Switch } from "./Switch";
 
-// Radix UI components
+// Radix UI Components
 export {
   Dialog,
   DialogPortal,
@@ -86,3 +87,21 @@ export {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from "./Select";
+
+// Common Reusable Components
+export {
+  default as LoadingSpinner,
+  LoadingOverlay,
+  SkeletonLoader,
+  GridSkeletonLoader,
+} from "../common/LoadingSpinner";
+
+export {
+  default as EmptyState,
+  EmptyCollection,
+  EmptySearchResults,
+  EmptyActivity,
+  EmptyUserList,
+  EmptyError,
+  QuickEmptyState,
+} from "../common/EmptyState";

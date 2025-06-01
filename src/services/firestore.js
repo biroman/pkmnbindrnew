@@ -101,26 +101,19 @@ export const updateUserPreferences = async (userId, preferences) => {
   try {
     const userDocRef = getUserDocRef(userId);
 
-    // Get current user data to merge with existing settings
-    const userDoc = await getDoc(userDocRef);
-    const currentData = userDoc.data();
-
-    // Merge new preferences with existing settings
-    const mergedSettings = {
-      ...currentData.settings,
-      binderPreferences: {
-        ...currentData.settings?.binderPreferences,
-        ...preferences,
-        updatedAt: serverTimestamp(),
-      },
+    // Use field-level updates instead of reading entire document first
+    const updateData = {
+      lastLoginAt: serverTimestamp(),
     };
 
-    await updateDoc(userDocRef, {
-      settings: mergedSettings,
-      lastLoginAt: serverTimestamp(),
+    // Add each preference as a nested field update
+    Object.keys(preferences).forEach((key) => {
+      updateData[`settings.binderPreferences.${key}`] = preferences[key];
     });
+    updateData[`settings.binderPreferences.updatedAt`] = serverTimestamp();
 
-    return { success: true, data: mergedSettings.binderPreferences };
+    await updateDoc(userDocRef, updateData);
+    return { success: true, data: preferences };
   } catch (error) {
     console.error("Error updating user preferences:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
@@ -450,44 +443,46 @@ export const getAdminStats = async () => {
   try {
     const startTime = Date.now();
 
-    // Get total user count
-    const usersRef = collection(db, "users");
-    const usersSnapshot = await getDocs(usersRef);
-    const totalUsers = usersSnapshot.size;
+    // Use Promise.all for concurrent queries instead of sequential
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // Get users created in last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const [allUsersSnapshot, recentUsersSnapshot, activeUsersSnapshot] =
+      await Promise.all([
+        // Get all users
+        getDocs(collection(db, "users")),
+        // Get users created in last 30 days
+        getDocs(
+          query(
+            collection(db, "users"),
+            where("createdAt", ">=", thirtyDaysAgo)
+          )
+        ),
+        // Get active users (logged in within last 7 days)
+        getDocs(
+          query(
+            collection(db, "users"),
+            where("lastLoginAt", ">=", sevenDaysAgo)
+          )
+        ),
+      ]);
 
-    const recentUsersQuery = query(
-      usersRef,
-      where("createdAt", ">=", thirtyDaysAgo)
-    );
-    const recentUsersSnapshot = await getDocs(recentUsersQuery);
+    // Process all results together
+    const totalUsers = allUsersSnapshot.size;
     const newUsersThisMonth = recentUsersSnapshot.size;
+    const activeUsers = activeUsersSnapshot.size;
 
-    // Calculate total binders across all users
+    // Calculate total binders and value across all users from the already fetched data
     let totalBindersAcrossUsers = 0;
     let totalValueAcrossUsers = 0;
     let usersWithData = 0;
 
-    usersSnapshot.docs.forEach((doc) => {
+    allUsersSnapshot.docs.forEach((doc) => {
       const userData = doc.data();
       totalBindersAcrossUsers += userData.totalBinders || 0;
       totalValueAcrossUsers += userData.totalValue || 0;
       if (userData.totalBinders > 0) usersWithData++;
     });
-
-    // Get active users (logged in within last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const activeUsersQuery = query(
-      usersRef,
-      where("lastLoginAt", ">=", sevenDaysAgo)
-    );
-    const activeUsersSnapshot = await getDocs(activeUsersQuery);
-    const activeUsers = activeUsersSnapshot.size;
 
     // Calculate system health based on available metrics
     const endTime = Date.now();
@@ -614,6 +609,47 @@ export const getAllUsers = async (limitCount = 50) => {
     console.error("getAllUsers: Error occurred:", error);
     console.error("getAllUsers: Error code:", error.code);
     console.error("getAllUsers: Error message:", error.message);
+    return { success: false, error: getFriendlyErrorMessage(error) };
+  }
+};
+
+// ===== USER ACCOUNT DELETION =====
+
+export const deleteUserAccount = async (userId) => {
+  try {
+    console.log(`Starting account deletion for user: ${userId}`);
+
+    const batch = writeBatch(db);
+
+    // Get user document reference
+    const userDocRef = getUserDocRef(userId);
+
+    // Delete all subcollections
+    const subcollections = ["binders", "activity", "wishlist", "collections"];
+
+    for (const subcollectionName of subcollections) {
+      const subcollectionRef = getUserSubcollection(userId, subcollectionName);
+      const snapshot = await getDocs(subcollectionRef);
+
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      console.log(
+        `Marked ${snapshot.size} documents in ${subcollectionName} for deletion`
+      );
+    }
+
+    // Delete the main user document
+    batch.delete(userDocRef);
+
+    // Commit the batch
+    await batch.commit();
+
+    console.log(`Successfully deleted all data for user: ${userId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting user account:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
   }
 };

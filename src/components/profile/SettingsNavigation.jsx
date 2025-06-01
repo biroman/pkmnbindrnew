@@ -13,10 +13,16 @@ import {
 const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
   const sections = [
     {
-      id: "profile",
-      name: "Profile",
-      description: "Manage your display name and profile information",
+      id: "account",
+      name: "Account",
+      description: "Personal information, email, and account details",
       icon: User,
+    },
+    {
+      id: "security",
+      name: "Security",
+      description: "Password and email verification settings",
+      icon: Lock,
     },
     {
       id: "binder-preferences",
@@ -41,18 +47,6 @@ const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
       name: "Notifications",
       description: "Email and in-app notification preferences",
       icon: Bell,
-    },
-    {
-      id: "security",
-      name: "Security",
-      description: "Password and email verification settings",
-      icon: Lock,
-    },
-    {
-      id: "account",
-      name: "Account",
-      description: "Account details and data management",
-      icon: Info,
     },
   ];
 

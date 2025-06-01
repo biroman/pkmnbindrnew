@@ -15,6 +15,59 @@ import {
 import GoogleSignInButton from "./GoogleSignInButton";
 import AuthDivider from "./AuthDivider";
 import { getFriendlyErrorMessage } from "../../utils/errorMessages";
+import {
+  validateStrongPassword,
+  isPasswordValid,
+} from "../../utils/passwordValidation";
+import PasswordStrengthIndicator from "../common/PasswordStrengthIndicator";
+import { Eye, EyeOff } from "lucide-react";
+
+// Enhanced password field with strength indicator
+const PasswordField = ({
+  label,
+  value,
+  onChange,
+  onBlur,
+  placeholder,
+  showPassword,
+  onToggleShow,
+  error,
+  id,
+  name,
+  showStrength = false,
+  className = "",
+}) => (
+  <FormField>
+    <Label htmlFor={id}>{label}</Label>
+    <div className="relative">
+      <Input
+        id={id}
+        name={name}
+        type={showPassword ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        className={`${className} ${error ? "border-red-500" : ""}`}
+        required
+      />
+      <button
+        type="button"
+        onClick={onToggleShow}
+        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+        tabIndex={-1}
+      >
+        {showPassword ? (
+          <EyeOff className="h-4 w-4" />
+        ) : (
+          <Eye className="h-4 w-4" />
+        )}
+      </button>
+    </div>
+    {error && <FormMessage>{error}</FormMessage>}
+    {showStrength && <PasswordStrengthIndicator password={value} />}
+  </FormField>
+);
 
 const SignupForm = ({ onToggleMode }) => {
   const [formData, setFormData] = useState({
@@ -27,6 +80,9 @@ const SignupForm = ({ onToggleMode }) => {
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [touchedFields, setTouchedFields] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const { signup, signinWithGoogle } = useAuth();
 
@@ -46,8 +102,9 @@ const SignupForm = ({ onToggleMode }) => {
     }
 
     if (touchedFields.password && formData.password) {
-      if (formData.password.length < 6) {
-        errors.password = "Password must be at least 6 characters";
+      const passwordError = validateStrongPassword(formData.password);
+      if (passwordError) {
+        errors.password = passwordError;
       }
     }
 
@@ -89,8 +146,9 @@ const SignupForm = ({ onToggleMode }) => {
       return "Passwords do not match";
     }
 
-    if (formData.password.length < 6) {
-      return "Password must be at least 6 characters";
+    const passwordError = validateStrongPassword(formData.password);
+    if (passwordError) {
+      return passwordError;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -122,6 +180,7 @@ const SignupForm = ({ onToggleMode }) => {
       setError("");
       setLoading(true);
       await signup(formData.email, formData.password, formData.displayName);
+      setSignupSuccess(true);
     } catch (error) {
       setError(getFriendlyErrorMessage(error));
     } finally {
@@ -146,7 +205,8 @@ const SignupForm = ({ onToggleMode }) => {
     formData.displayName &&
     formData.email &&
     formData.password &&
-    formData.confirmPassword;
+    formData.confirmPassword &&
+    isPasswordValid(formData.password);
 
   return (
     <Card variant="elevated" className="w-full max-w-md mx-auto">
@@ -160,97 +220,112 @@ const SignupForm = ({ onToggleMode }) => {
           </p>
         </div>
 
-        {error && (
+        {/* Display success message after signup */}
+        {signupSuccess && (
+          <Alert variant="success" className="mb-6">
+            <AlertDescription>
+              Account created successfully! A verification email has been sent
+              to
+              <span className="font-semibold"> {formData.email}</span>. Please
+              check your inbox (and spam folder) to verify your account.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Display general error message if signupSuccess is false */}
+        {error && !signupSuccess && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <FormField>
-            <Label htmlFor="displayName">Display name</Label>
-            <Input
-              id="displayName"
-              name="displayName"
-              type="text"
-              value={formData.displayName}
-              onChange={handleChange}
-              onBlur={() => handleBlur("displayName")}
-              placeholder="Enter your display name"
-              className={validationErrors.displayName ? "border-red-500" : ""}
-              required
-            />
-            {validationErrors.displayName && (
-              <FormMessage>{validationErrors.displayName}</FormMessage>
-            )}
-          </FormField>
+        {/* Hide form if signupSuccess is true, or adjust UI accordingly */}
+        {!signupSuccess && (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <FormField>
+              <Label htmlFor="displayName">Display name</Label>
+              <Input
+                id="displayName"
+                name="displayName"
+                type="text"
+                value={formData.displayName}
+                onChange={handleChange}
+                onBlur={() => handleBlur("displayName")}
+                placeholder="Enter your display name"
+                className={validationErrors.displayName ? "border-red-500" : ""}
+                required
+              />
+              {validationErrors.displayName && (
+                <FormMessage>{validationErrors.displayName}</FormMessage>
+              )}
+            </FormField>
 
-          <FormField>
-            <Label htmlFor="email">Email address</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              onBlur={() => handleBlur("email")}
-              placeholder="Enter your email"
-              className={validationErrors.email ? "border-red-500" : ""}
-              required
-            />
-            {validationErrors.email && (
-              <FormMessage>{validationErrors.email}</FormMessage>
-            )}
-          </FormField>
+            <FormField>
+              <Label htmlFor="email">Email address</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                onBlur={() => handleBlur("email")}
+                placeholder="Enter your email"
+                className={validationErrors.email ? "border-red-500" : ""}
+                required
+              />
+              {validationErrors.email && (
+                <FormMessage>{validationErrors.email}</FormMessage>
+              )}
+            </FormField>
 
-          <FormField>
-            <Label htmlFor="password">Password</Label>
-            <Input
+            <PasswordField
               id="password"
               name="password"
-              type="password"
+              label="Password"
               value={formData.password}
               onChange={handleChange}
               onBlur={() => handleBlur("password")}
-              placeholder="Create a password"
-              className={validationErrors.password ? "border-red-500" : ""}
-              required
+              placeholder="Create a strong password"
+              showPassword={showPassword}
+              onToggleShow={() => setShowPassword(!showPassword)}
+              error={validationErrors.password}
+              showStrength={true}
             />
-            <FormDescription>Must be at least 6 characters</FormDescription>
-            {validationErrors.password && (
-              <FormMessage>{validationErrors.password}</FormMessage>
-            )}
-          </FormField>
 
-          <FormField>
-            <Label htmlFor="confirmPassword">Confirm password</Label>
-            <Input
+            <PasswordField
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
+              label="Confirm password"
               value={formData.confirmPassword}
               onChange={handleChange}
               onBlur={() => handleBlur("confirmPassword")}
               placeholder="Confirm your password"
-              className={
-                validationErrors.confirmPassword ? "border-red-500" : ""
-              }
-              required
+              showPassword={showConfirmPassword}
+              onToggleShow={() => setShowConfirmPassword(!showConfirmPassword)}
+              error={validationErrors.confirmPassword}
             />
-            {validationErrors.confirmPassword && (
-              <FormMessage>{validationErrors.confirmPassword}</FormMessage>
-            )}
-          </FormField>
 
+            <Button
+              type="submit"
+              loading={loading}
+              disabled={loading || !isFormValid}
+              className="w-full"
+            >
+              Create Account
+            </Button>
+          </form>
+        )}
+
+        {/* Optionally, show login button or different content after success */}
+        {signupSuccess && (
           <Button
-            type="submit"
-            loading={loading}
-            disabled={loading || !isFormValid}
-            className="w-full"
+            onClick={onToggleMode}
+            className="w-full mt-6"
+            variant="outline"
           >
-            Create Account
+            Proceed to Login
           </Button>
-        </form>
+        )}
 
         <AuthDivider />
 

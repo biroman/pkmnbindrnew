@@ -5,9 +5,129 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pkmnbindr</title>
+
+    <!-- Prevent white flash - immediate styling -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f9fafb;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+
+      /* Dark mode support */
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background-color: #111827;
+          color: #f9fafb;
+        }
+      }
+
+      /* Initial loading screen */
+      #initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #101828;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+
+      #initial-loader.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .loader-content {
+        text-align: center;
+        color: white;
+      }
+
+      .loader-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+
+      .loader-text {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .loader-subtitle {
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Hide the loader when React loads */
+      .react-loaded #initial-loader {
+        display: none;
+      }
+    </style>
   </head>
   <body>
+    <!-- Initial loading screen -->
+    <div id="initial-loader">
+      <div class="loader-content">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Pkmnbindr ⚡</div>
+        <div class="loader-subtitle">Loading your Pokemon collection...</div>
+      </div>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Remove loader when React is ready -->
+    <script>
+      // Hide loader once React starts rendering
+      window.addEventListener("DOMContentLoaded", function () {
+        setTimeout(function () {
+          const loader = document.getElementById("initial-loader");
+          const root = document.getElementById("root");
+
+          // Check if React has started rendering
+          const checkReactLoaded = setInterval(function () {
+            if (root && root.children.length > 0) {
+              loader.classList.add("fade-out");
+              setTimeout(() => {
+                loader.style.display = "none";
+              }, 500);
+              clearInterval(checkReactLoaded);
+            }
+          }, 100);
+
+          // Fallback: hide after 3 seconds max
+          setTimeout(function () {
+            loader.classList.add("fade-out");
+            setTimeout(() => {
+              loader.style.display = "none";
+            }, 500);
+            clearInterval(checkReactLoaded);
+          }, 3000);
+        }, 100);
+      });
+    </script>
   </body>
 </html>

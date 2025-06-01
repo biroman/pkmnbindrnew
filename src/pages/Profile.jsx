@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import SettingsNavigation from "../components/profile/SettingsNavigation";
-import ProfileSection from "../components/profile/sections/ProfileSection";
 import SecuritySection from "../components/profile/sections/SecuritySection";
 import AccountSection from "../components/profile/sections/AccountSection";
 import AdminSection from "../components/profile/sections/AdminSection";
@@ -17,19 +16,33 @@ const Profile = () => {
     sendVerificationEmail,
     isEmailVerified,
     refreshUser,
+    deleteAccount,
     isOwner,
   } = useAuth();
 
-  const [activeSection, setActiveSection] = useState("profile");
+  // Default to account section instead of profile
+  const [activeSection, setActiveSection] = useState("account");
 
   const renderContent = () => {
     switch (activeSection) {
-      case "profile":
+      case "account":
         return (
-          <ProfileSection
+          <AccountSection
             currentUser={currentUser}
             userProfile={userProfile}
             updateUserFirestoreProfile={updateUserFirestoreProfile}
+            isEmailVerified={isEmailVerified}
+            isOwner={isOwner}
+          />
+        );
+      case "security":
+        return (
+          <SecuritySection
+            changePassword={changePassword}
+            isEmailVerified={isEmailVerified}
+            sendVerificationEmail={sendVerificationEmail}
+            refreshUser={refreshUser}
+            deleteAccount={deleteAccount}
           />
         );
       case "binder-preferences":
@@ -79,24 +92,6 @@ const Profile = () => {
               </p>
             </div>
           </div>
-        );
-      case "security":
-        return (
-          <SecuritySection
-            changePassword={changePassword}
-            isEmailVerified={isEmailVerified}
-            sendVerificationEmail={sendVerificationEmail}
-            refreshUser={refreshUser}
-          />
-        );
-      case "account":
-        return (
-          <AccountSection
-            currentUser={currentUser}
-            userProfile={userProfile}
-            isEmailVerified={isEmailVerified}
-            isOwner={isOwner}
-          />
         );
       case "admin":
         return (

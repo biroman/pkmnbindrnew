@@ -13,8 +13,15 @@ import {
   CardTitle,
   CardContent,
 } from "../ui";
+import {
+  getPasswordRequirements,
+  validateStrongPassword,
+  isPasswordValid,
+} from "../../utils/passwordValidation";
+import PasswordStrengthIndicator from "../common/PasswordStrengthIndicator";
+import { useEmailVerificationRestrictions } from "../../hooks/useEmailVerificationRestrictions";
 
-// Move PasswordField outside the main component to prevent recreation
+// Enhanced password field with strength indicator
 const PasswordField = ({
   label,
   value,
@@ -24,6 +31,8 @@ const PasswordField = ({
   onToggleShow,
   error,
   id,
+  showStrength = false,
+  disabled = false,
 }) => (
   <FormField>
     <Label htmlFor={id}>{label}</Label>
@@ -35,11 +44,13 @@ const PasswordField = ({
         onChange={onChange}
         placeholder={placeholder}
         className={error ? "border-red-500" : ""}
+        disabled={disabled}
       />
       <button
         type="button"
         onClick={onToggleShow}
-        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+        disabled={disabled}
+        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {showPassword ? (
           <EyeOff className="h-4 w-4" />
@@ -49,6 +60,7 @@ const PasswordField = ({
       </button>
     </div>
     {error && <FormMessage>{error}</FormMessage>}
+    {showStrength && <PasswordStrengthIndicator password={value} />}
   </FormField>
 );
 
@@ -63,6 +75,10 @@ const SecuritySettings = ({ changePassword }) => {
   const [passwordAlert, setPasswordAlert] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
 
+  const { isFeatureRestricted, getRestrictionMessage } =
+    useEmailVerificationRestrictions();
+  const isPasswordChangeRestricted = isFeatureRestricted("changePassword");
+
   // Clear alerts after 5 seconds
   useEffect(() => {
     if (passwordAlert) {
@@ -75,8 +91,11 @@ const SecuritySettings = ({ changePassword }) => {
   useEffect(() => {
     const errors = {};
 
-    if (newPassword && newPassword.length < 6) {
-      errors.newPassword = "Password must be at least 6 characters";
+    if (newPassword) {
+      const passwordError = validateStrongPassword(newPassword);
+      if (passwordError) {
+        errors.newPassword = passwordError;
+      }
     }
 
     if (confirmPassword && newPassword !== confirmPassword) {
@@ -86,10 +105,9 @@ const SecuritySettings = ({ changePassword }) => {
     setValidationErrors(errors);
   }, [newPassword, confirmPassword]);
 
-  // Validation functions
+  // Basic validation functions
   const validatePassword = (password) => {
     if (!password) return "Password is required";
-    if (password.length < 6) return "Password must be at least 6 characters";
     return null;
   };
 
@@ -102,8 +120,16 @@ const SecuritySettings = ({ changePassword }) => {
   const handleChangePassword = async (e) => {
     e.preventDefault();
 
+    if (isPasswordChangeRestricted) {
+      setPasswordAlert({
+        type: "error",
+        message: getRestrictionMessage("changePassword"),
+      });
+      return;
+    }
+
     const currentPasswordError = validatePassword(currentPassword);
-    const newPasswordError = validatePassword(newPassword);
+    const newPasswordError = validateStrongPassword(newPassword);
     const matchError = validatePasswordMatch(newPassword, confirmPassword);
 
     if (currentPasswordError) {
@@ -127,22 +153,36 @@ const SecuritySettings = ({ changePassword }) => {
       if (result.success) {
         setPasswordAlert({
           type: "success",
-          message: "Password changed successfully!",
+          message:
+            "Password changed successfully! Your new strong password is now active.",
         });
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         setValidationErrors({});
       } else {
+        // Handle specific error cases with additional context
+        let errorMessage = result.error;
+
+        if (result.error.includes("Current password is incorrect")) {
+          errorMessage =
+            "Current password is incorrect. Please double-check your current password and try again.";
+        } else if (result.error.includes("New password is too weak")) {
+          errorMessage =
+            "New password is too weak. Please ensure it meets all the security requirements above.";
+        }
+
         setPasswordAlert({
           type: "error",
-          message: result.error || "Failed to change password",
+          message: errorMessage,
         });
       }
     } catch (error) {
+      console.error("Password change error:", error);
       setPasswordAlert({
         type: "error",
-        message: "An unexpected error occurred",
+        message:
+          "An unexpected error occurred while changing your password. Please try again.",
       });
     } finally {
       setIsChangingPassword(false);
@@ -154,10 +194,18 @@ const SecuritySettings = ({ changePassword }) => {
       <CardHeader>
         <CardTitle className="flex items-center">
           <Lock className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
-          Security Settings
+          Password Security
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {isPasswordChangeRestricted && (
+          <Alert variant="warning" className="mb-6">
+            <AlertDescription>
+              ⚠️ {getRestrictionMessage("changePassword")}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleChangePassword} className="space-y-6">
           {passwordAlert && (
             <Alert
@@ -177,6 +225,7 @@ const SecuritySettings = ({ changePassword }) => {
             placeholder="Enter your current password"
             showPassword={showCurrentPassword}
             onToggleShow={() => setShowCurrentPassword(!showCurrentPassword)}
+            disabled={isPasswordChangeRestricted}
           />
 
           <PasswordField
@@ -188,6 +237,8 @@ const SecuritySettings = ({ changePassword }) => {
             showPassword={showNewPassword}
             onToggleShow={() => setShowNewPassword(!showNewPassword)}
             error={validationErrors.newPassword}
+            showStrength={true}
+            disabled={isPasswordChangeRestricted}
           />
 
           <PasswordField
@@ -199,6 +250,7 @@ const SecuritySettings = ({ changePassword }) => {
             showPassword={showConfirmPassword}
             onToggleShow={() => setShowConfirmPassword(!showConfirmPassword)}
             error={validationErrors.confirmPassword}
+            disabled={isPasswordChangeRestricted}
           />
 
           <div className="flex justify-end">
@@ -209,7 +261,9 @@ const SecuritySettings = ({ changePassword }) => {
                 !currentPassword ||
                 !newPassword ||
                 !confirmPassword ||
-                Object.keys(validationErrors).length > 0
+                !isPasswordValid(newPassword) ||
+                Object.keys(validationErrors).length > 0 ||
+                isPasswordChangeRestricted
               }
               className="flex items-center"
             >

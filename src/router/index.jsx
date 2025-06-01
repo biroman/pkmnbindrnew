@@ -8,26 +8,29 @@ import PublicRoute from "../components/routing/PublicRoute";
 // Layout components
 import AppLayout from "../components/layout/AppLayout";
 
-// Lazy load pages for better performance
-const WelcomeDashboard = lazy(() =>
-  import("../components/dashboard/WelcomeDashboard")
-);
+// EAGER LOAD - Core pages for instant access (no loading delay)
+import WelcomeDashboard from "../components/dashboard/WelcomeDashboard";
+import Collections from "../pages/Collections";
+import Collection from "../pages/Collection";
+import AddCard from "../pages/AddCard";
+import Statistics from "../pages/Statistics";
+
+// LAZY LOAD - Less frequently accessed pages
 const Auth = lazy(() => import("../components/auth/Auth"));
-const Collection = lazy(() => import("../pages/Collection"));
-const AddCard = lazy(() => import("../pages/AddCard"));
-const Collections = lazy(() => import("../pages/Collections"));
+const AuthAction = lazy(() => import("../components/auth/AuthAction"));
 const Wishlist = lazy(() => import("../pages/Wishlist"));
-const Statistics = lazy(() => import("../pages/Statistics"));
 const Profile = lazy(() => import("../pages/Profile"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const UnderDevelopment = lazy(() => import("../pages/UnderDevelopment"));
 
-// Loading component for Suspense
+// Improved loading component for Suspense
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+  <div className="min-h-[50vh] flex items-center justify-center">
     <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-      <p className="text-gray-600 dark:text-gray-400">Loading page...</p>
+      <div className="relative">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-3"></div>
+      </div>
+      <p className="text-gray-600 dark:text-gray-400 text-sm">Loading...</p>
     </div>
   </div>
 );
@@ -39,7 +42,7 @@ const LazyRoute = ({ children }) => (
 
 // Router configuration
 export const router = createBrowserRouter([
-  // Landing page - Under Development
+  // Landing page - Keep lazy (not frequently accessed)
   {
     path: "/",
     element: (
@@ -61,6 +64,16 @@ export const router = createBrowserRouter([
     ),
   },
 
+  // Auth action handler (password reset, email verification)
+  {
+    path: "/auth/action",
+    element: (
+      <LazyRoute>
+        <AuthAction />
+      </LazyRoute>
+    ),
+  },
+
   // Protected routes (require authentication) - accessible via direct URLs
   {
     path: "/app",
@@ -70,55 +83,41 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      // Dashboard
+      // Dashboard - EAGER LOADED (instant access)
       {
         index: true,
-        element: (
-          <LazyRoute>
-            <WelcomeDashboard />
-          </LazyRoute>
-        ),
+        element: <WelcomeDashboard />,
       },
       {
         path: "dashboard",
-        element: (
-          <LazyRoute>
-            <WelcomeDashboard />
-          </LazyRoute>
-        ),
+        element: <WelcomeDashboard />,
       },
 
-      // Collection management
+      // Collection management - EAGER LOADED (core features)
       {
         path: "collection",
-        element: (
-          <LazyRoute>
-            <Collection />
-          </LazyRoute>
-        ),
+        element: <Collection />,
       },
 
-      // Add new card
+      // Add new card - EAGER LOADED (frequently used)
       {
         path: "add-card",
-        element: (
-          <LazyRoute>
-            <AddCard />
-          </LazyRoute>
-        ),
+        element: <AddCard />,
       },
 
-      // Collections/Binders
+      // Collections/Binders - EAGER LOADED (main feature)
       {
         path: "collections",
-        element: (
-          <LazyRoute>
-            <Collections />
-          </LazyRoute>
-        ),
+        element: <Collections />,
       },
 
-      // Wishlist
+      // Statistics - EAGER LOADED (accessed from dashboard)
+      {
+        path: "stats",
+        element: <Statistics />,
+      },
+
+      // Wishlist - LAZY LOADED (less frequent)
       {
         path: "wishlist",
         element: (
@@ -128,17 +127,7 @@ export const router = createBrowserRouter([
         ),
       },
 
-      // Statistics
-      {
-        path: "stats",
-        element: (
-          <LazyRoute>
-            <Statistics />
-          </LazyRoute>
-        ),
-      },
-
-      // Profile
+      // Profile - LAZY LOADED (less frequent)
       {
         path: "profile",
         element: (
@@ -150,7 +139,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // 404 catch-all route
+  // 404 catch-all route - LAZY LOADED
   {
     path: "*",
     element: (

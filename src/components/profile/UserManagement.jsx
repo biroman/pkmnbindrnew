@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   Mail,
   Activity,
+  XCircle,
+  RotateCcw,
 } from "lucide-react";
 import {
   Button,
@@ -22,12 +24,25 @@ import {
   SelectValue,
   FormField,
   Label,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+  Alert,
+  AlertDescription,
 } from "../ui";
 import { getAllUsers } from "../../services/firestore";
 import { useAuth } from "../../contexts/AuthContext";
 
 const UserManagement = () => {
-  const { currentUser, userProfile, isOwner } = useAuth();
+  // Email verification reset functionality - Updated
+  const { currentUser, userProfile, isOwner, resetUserVerification } =
+    useAuth();
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +50,13 @@ const UserManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Verification reset state
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [resetReason, setResetReason] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetAlert, setResetAlert] = useState(null);
 
   // Load users
   const loadUsers = async () => {
@@ -201,6 +223,90 @@ const UserManagement = () => {
     }
   };
 
+  // Handle verification reset
+  const handleResetVerification = async () => {
+    if (!selectedUser || !resetReason.trim()) {
+      setResetAlert({
+        type: "error",
+        message: "Please provide a reason for resetting verification.",
+      });
+      return;
+    }
+
+    setIsResetting(true);
+    setResetAlert(null);
+
+    try {
+      const result = await resetUserVerification(
+        selectedUser.id,
+        resetReason.trim()
+      );
+
+      if (result.success) {
+        setResetAlert({
+          type: "success",
+          message: result.message || "User verification reset successfully!",
+        });
+
+        // Refresh the user list
+        await loadUsers();
+
+        // Close dialog after a short delay
+        setTimeout(() => {
+          setResetDialogOpen(false);
+          setSelectedUser(null);
+          setResetReason("");
+          setResetAlert(null);
+        }, 2000);
+      } else {
+        setResetAlert({
+          type: "error",
+          message: result.error || "Failed to reset user verification.",
+        });
+      }
+    } catch (error) {
+      console.error("Error resetting verification:", error);
+      setResetAlert({
+        type: "error",
+        message: "An unexpected error occurred while resetting verification.",
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const openResetDialog = (user) => {
+    setSelectedUser(user);
+    setResetReason("");
+    setResetAlert(null);
+    setResetDialogOpen(true);
+  };
+
+  const closeResetDialog = () => {
+    setResetDialogOpen(false);
+    setSelectedUser(null);
+    setResetReason("");
+    setResetAlert(null);
+  };
+
+  // Check if user has verified email (approximation)
+  const isUserEmailVerified = (user) => {
+    // If user has an admin reset that's not acknowledged, they're unverified
+    if (
+      user.emailVerificationReset?.isResetByAdmin &&
+      !user.emailVerificationReset?.acknowledged
+    ) {
+      return false;
+    }
+    // For this demo, we'll assume users are verified if they have logged in multiple times
+    // In a real app, you'd track this separately or check Firebase Auth
+    return (
+      user.lastLoginAt &&
+      user.createdAt &&
+      user.lastLoginAt.seconds > user.createdAt.seconds + 300
+    ); // Logged in 5+ minutes after creation
+  };
+
   return (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -245,8 +351,8 @@ const UserManagement = () => {
               <SelectValue placeholder="Sort by..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="createdAt">Registration Date</SelectItem>
               <SelectItem value="lastLoginAt">Last Login</SelectItem>
+              <SelectItem value="createdAt">Registration Date</SelectItem>
               <SelectItem value="displayName">Name</SelectItem>
               <SelectItem value="email">Email</SelectItem>
             </SelectContent>
@@ -386,6 +492,24 @@ const UserManagement = () => {
                       </div>
                     </div>
 
+                    {/* Email Verification Status */}
+                    <div className="flex items-center space-x-2">
+                      {isUserEmailVerified(user) ? (
+                        <div className="flex items-center space-x-1 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30">
+                          <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+                          <span className="text-xs font-medium text-green-600 dark:text-green-400">
+                            Verified
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30">
+                          <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
+                          <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                            Unverified
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     {/* Status Badge */}
                     <div
                       className={`flex items-center space-x-1 px-2 py-1 rounded-full ${statusDisplay.bg}`}
@@ -404,6 +528,83 @@ const UserManagement = () => {
           })}
         </div>
       )}
+
+      {/* Verification Reset Dialog */}
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <RotateCcw className="h-5 w-5 text-red-500 mr-2" />
+              Reset Email Verification
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-sm text-gray-500 dark:text-gray-400 space-y-3">
+                <p>You are about to reset the email verification for:</p>
+                <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded border">
+                  <div className="font-semibold">
+                    {selectedUser?.displayName || "No display name"}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {selectedUser?.email}
+                  </div>
+                </div>
+                <p>
+                  This will require the user to verify their email address again
+                  before they can access restricted features.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            {resetAlert && (
+              <Alert
+                variant={
+                  resetAlert.type === "error" ? "destructive" : "success"
+                }
+              >
+                <AlertDescription>{resetAlert.message}</AlertDescription>
+              </Alert>
+            )}
+
+            <FormField>
+              <Label htmlFor="reset-reason">Reason for Reset</Label>
+              <textarea
+                id="reset-reason"
+                placeholder="Please provide a reason for resetting this user's email verification..."
+                value={resetReason}
+                onChange={(e) => setResetReason(e.target.value)}
+                className="w-full min-h-[80px] p-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white resize-vertical"
+                disabled={isResetting}
+                rows={3}
+              />
+            </FormField>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={closeResetDialog}
+              disabled={isResetting}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetVerification}
+              disabled={isResetting || !resetReason.trim()}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isResetting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                "Reset Verification"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

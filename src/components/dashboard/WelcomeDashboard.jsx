@@ -1,287 +1,382 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import Card from "../ui/Card";
+import {
+  useUserProfile,
+  useUserBinders,
+  useUserActivity,
+} from "../../hooks/useUserData";
+import { Card } from "../ui";
 import Button from "../ui/Button";
 import {
   Plus,
-  Library,
-  Search,
-  BarChart3,
+  Share2,
+  Eye,
+  BookOpen,
   Star,
-  Gem,
   TrendingUp,
-  Target,
-  Package,
-  PlusCircle,
+  Calendar,
+  Users,
+  Crown,
+  Zap,
+  Gift,
+  Trophy,
 } from "lucide-react";
 
 const WelcomeDashboard = () => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser } = useAuth();
+  const { data: userProfile } = useUserProfile(currentUser?.uid);
+  const { data: userBinders, isLoading: bindersLoading } = useUserBinders(
+    currentUser?.uid,
+    { limit: 5 }
+  );
+  const { data: userActivity, isLoading: activityLoading } = useUserActivity(
+    currentUser?.uid,
+    5
+  );
 
-  // Calculate display values from userProfile
-  const displayName =
-    userProfile?.displayName || currentUser?.displayName || "Trainer";
-  const totalBinders = userProfile?.totalBinders || 0;
-  const totalValue = userProfile?.totalValue || 0;
-  const currency = userProfile?.settings?.currency || "USD";
+  const displayName = userProfile?.data?.displayName || "Trainer";
 
-  // Format currency value
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
+  // Real user stats from profile
+  const totalBinders = userProfile?.data?.totalBinders || 0;
+  const totalCards = userProfile?.data?.totalCards || 0;
+  const sharedBinders = userProfile?.data?.sharedBinders || 0;
+  const views = userProfile?.data?.totalViews || 0;
+
+  // Calculate real stats from actual data
+  const recentBinders = userBinders?.data || [];
+  const recentActivities = userActivity?.data || [];
+
+  // Real calculated stats
+  const realStats = {
+    favoriteCards: recentBinders.filter((binder) => binder.isFavorite).length,
+    rareCards: recentBinders.filter(
+      (binder) =>
+        binder.rarity === "Rare" ||
+        binder.rarity === "Epic" ||
+        binder.rarity === "Legendary"
+    ).length,
+    completedSets: recentBinders.filter((binder) => binder.isComplete).length,
+    recentlyAdded: recentActivities.filter(
+      (activity) =>
+        activity.type === "binder_added" &&
+        new Date(activity.timestamp?.toDate?.() || activity.timestamp) >
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    ).length,
   };
 
-  // Quick actions data
   const quickActions = [
     {
-      title: "Add New Binder",
-      description: "Add a new Pokemon binder to your collection",
-      icon: <PlusCircle className="h-6 w-6" />,
-      action: () => console.log("Add binder"),
+      title: "Create New Binder",
+      description: "Start organizing a new collection",
+      icon: <Plus className="h-5 w-5" />,
+      href: "/app/collections",
       color: "bg-blue-500 hover:bg-blue-600",
     },
     {
-      title: "View Collection",
-      description: "Browse your entire binder collection",
-      icon: <Library className="h-6 w-6" />,
-      action: () => console.log("View collection"),
+      title: "Add Cards",
+      description: "Add cards to your collection",
+      icon: <BookOpen className="h-5 w-5" />,
+      href: "/app/add-card",
       color: "bg-green-500 hover:bg-green-600",
     },
     {
-      title: "Search Binders",
-      description: "Find specific binders in your collection",
-      icon: <Search className="h-6 w-6" />,
-      action: () => console.log("Search binders"),
+      title: "Share Collection",
+      description: "Share your binders with friends",
+      icon: <Share2 className="h-5 w-5" />,
+      href: "/app/collections",
       color: "bg-purple-500 hover:bg-purple-600",
     },
     {
-      title: "Statistics",
-      description: "Analyze your collection statistics",
-      icon: <BarChart3 className="h-6 w-6" />,
-      action: () => console.log("View statistics"),
-      color: "bg-yellow-500 hover:bg-yellow-600",
-    },
-    {
-      title: "Favorites",
-      description: "View your favorite binders",
-      icon: <Star className="h-6 w-6" />,
-      action: () => console.log("View favorites"),
-      color: "bg-pink-500 hover:bg-pink-600",
-    },
-    {
-      title: "Rare Binders",
-      description: "Find rare and unique binders",
-      icon: <Gem className="h-6 w-6" />,
-      action: () => console.log("View rare binders"),
-      color: "bg-indigo-500 hover:bg-indigo-600",
-    },
-    {
-      title: "Price Tracker",
-      description: "Track binder prices and trends",
-      icon: <TrendingUp className="h-6 w-6" />,
-      action: () => console.log("Track price"),
-      color: "bg-teal-500 hover:bg-teal-600",
-    },
-    {
-      title: "Wishlist",
-      description: "Manage your wishlist of binders",
-      icon: <Target className="h-6 w-6" />,
-      action: () => console.log("View wishlist"),
-      color: "bg-red-500 hover:bg-red-600",
+      title: "View Statistics",
+      description: "Analyze your collection data",
+      icon: <TrendingUp className="h-5 w-5" />,
+      href: "/app/stats",
+      color: "bg-orange-500 hover:bg-orange-600",
     },
   ];
 
-  // Collection progress calculation (example: progress towards a goal)
-  const collectionProgress =
-    totalBinders > 0
-      ? Math.min(Math.round((totalBinders / 100) * 100), 100)
-      : 0; // Example: goal of 100 binders
-
   return (
-    <div className="space-y-6">
-      {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-800 dark:to-purple-800 rounded-xl shadow-sm p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">
-              Welcome back, {displayName}! 👋
-            </h1>
-            <p className="text-blue-100 dark:text-blue-200">
-              Ready to manage your Pokemon binder collection?
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold">
-              {totalBinders.toLocaleString()}
-            </div>
-            <div className="text-blue-100 dark:text-blue-200 text-sm">
-              Total Binders
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Total Binders
-              </h3>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {totalBinders}
-              </p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="space-y-8">
+        {/* Welcome Header */}
+        <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-2xl shadow-lg p-8 text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">
+                  Welcome back, {displayName}! ⚡
+                </h1>
+                <p className="text-blue-100 text-lg">
+                  Ready to showcase your Pokemon collection?
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-4xl font-bold mb-1">
+                  {totalBinders.toLocaleString()}
+                </div>
+                <div className="text-blue-100 text-sm uppercase tracking-wide">
+                  Total Binders
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <Card variant="elevated" className="p-3 sm:p-6">
-          <div className="text-center">
-            <div className="text-xl sm:text-3xl font-bold text-green-600 dark:text-green-400 mb-1 sm:mb-2">
-              0
+        {/* Key Statistics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-6 text-center hover:shadow-md transition-shadow">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full w-fit mx-auto mb-3">
+              <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Collections
+            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {totalCards.toLocaleString()}
             </div>
-          </div>
-        </Card>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Total Cards
+            </div>
+          </Card>
 
-        <Card
-          variant="elevated"
-          className="p-3 sm:p-6 col-span-2 sm:col-span-1"
-        >
-          <div className="text-center">
-            <div className="text-xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400 mb-1 sm:mb-2">
-              {collectionProgress}%
+          <Card className="p-6 text-center hover:shadow-md transition-shadow">
+            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full w-fit mx-auto mb-3">
+              <Share2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Collection Progress
+            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {sharedBinders}
             </div>
-          </div>
-        </Card>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Shared Binders
+            </div>
+          </Card>
 
-        <Card variant="elevated" className="p-3 sm:p-6">
-          <div className="text-center">
-            <div className="text-xl sm:text-3xl font-bold text-yellow-600 dark:text-yellow-400 mb-1 sm:mb-2">
-              0
+          <Card className="p-6 text-center hover:shadow-md transition-shadow">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full w-fit mx-auto mb-3">
+              <Eye className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {views.toLocaleString()}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Total Views
+            </div>
+          </Card>
+
+          <Card className="p-6 text-center hover:shadow-md transition-shadow">
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full w-fit mx-auto mb-3">
+              <Star className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+              {realStats.favoriteCards}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Favorite Cards
             </div>
-          </div>
-        </Card>
-
-        <Card variant="elevated" className="p-3 sm:p-6">
-          <div className="text-center">
-            <div className="text-xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-1 sm:mb-2">
-              0
-            </div>
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Rare Cards
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          variant="elevated"
-          className="p-3 sm:p-6 col-span-2 sm:col-span-1"
-        >
-          <div className="text-center">
-            <div className="text-xl sm:text-3xl font-bold text-pink-600 dark:text-pink-400 mb-1 sm:mb-2">
-              {formatCurrency(totalValue)}
-            </div>
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Total Value
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Dashboard Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Quick Actions */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Quick Actions
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {quickActions.map((action, index) => (
-                <button
-                  key={index}
-                  onClick={action.action}
-                  className={`${action.color} text-white p-4 rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-lg group`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="group-hover:scale-110 transition-transform duration-200">
-                      {action.icon}
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-semibold">{action.title}</h3>
-                      <p className="text-sm opacity-90">{action.description}</p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Activity or Collection Overview */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Collection Overview
-            </h2>
-            {totalBinders === 0 ? (
-              <div className="text-center py-8">
-                <Package className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  Start Your Collection
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-4 max-w-sm mx-auto">
-                  You haven't added any Pokemon binders yet. Start building your
-                  collection today!
-                </p>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors">
-                  Add Your First Binder
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Collection Progress
-                  </span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">
-                    {collectionProgress}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${collectionProgress}%` }}
-                  ></div>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  You have {totalBinders} binder{totalBinders !== 1 ? "s" : ""}{" "}
-                  in your collection worth ${totalValue.toLocaleString()}.
-                </p>
-              </div>
-            )}
-          </div>
+          </Card>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* ... existing sidebar content ... */}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Quick Actions & Collection Overview */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Quick Actions */}
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                Quick Actions
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {quickActions.map((action, index) => (
+                  <Link
+                    key={index}
+                    to={action.href}
+                    className={`${action.color} text-white p-5 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg group block`}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="group-hover:scale-110 transition-transform duration-200">
+                        {action.icon}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">
+                          {action.title}
+                        </h3>
+                        <p className="text-xs opacity-90 mt-1">
+                          {action.description}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+
+            {/* Collection Overview */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Collection Overview
+                </h2>
+                <Link
+                  to="/app/collections"
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  View All →
+                </Link>
+              </div>
+
+              {totalBinders === 0 ? (
+                <div className="text-center py-12">
+                  <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-fit mx-auto mb-4">
+                    <BookOpen className="h-12 w-12 text-gray-400 dark:text-gray-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    Start Your Pokemon Journey
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    Create your first binder and start organizing your Pokemon
+                    cards. Share your collection with friends and fellow
+                    collectors!
+                  </p>
+                  <Link
+                    to="/app/collections"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors inline-flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create First Binder</span>
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <Crown className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                    <div className="text-lg font-bold text-gray-900 dark:text-white">
+                      {realStats.rareCards}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Rare Cards
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <Zap className="h-8 w-8 text-orange-500 mx-auto mb-2" />
+                    <div className="text-lg font-bold text-gray-900 dark:text-white">
+                      {realStats.completedSets}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Complete Sets
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <Gift className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <div className="text-lg font-bold text-gray-900 dark:text-white">
+                      {realStats.recentlyAdded}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Added This Week
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <Users className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                    <div className="text-lg font-bold text-gray-900 dark:text-white">
+                      {views}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Profile Views
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Right Column - Recent Activity & Featured */}
+          <div className="space-y-6">
+            {/* Recent Activity */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Recent Activity
+              </h3>
+              <div className="space-y-3">
+                {recentActivities.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No recent activity</p>
+                  </div>
+                ) : (
+                  recentActivities.map((activity, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                    >
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                        {activity.type === "binder_added" && (
+                          <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        )}
+                        {activity.type === "binder_shared" && (
+                          <Share2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        )}
+                        {activity.type === "profile_updated" && (
+                          <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                        )}
+                        {![
+                          "binder_added",
+                          "binder_shared",
+                          "profile_updated",
+                        ].includes(activity.type) && (
+                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {activity.description || activity.type}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {activity.timestamp
+                            ? new Date(
+                                activity.timestamp?.toDate?.() ||
+                                  activity.timestamp
+                              ).toLocaleDateString()
+                            : "Recently"}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+
+            {/* Featured Binder */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Featured Collection
+              </h3>
+              {totalBinders === 0 ? (
+                <div className="text-center py-6">
+                  <BookOpen className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Create your first binder to see it featured here
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Star className="h-5 w-5 text-yellow-500" />
+                    <h4 className="font-semibold text-gray-900 dark:text-white">
+                      My Champion Cards
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Your most viewed collection with rare Pokemon cards
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      142 views • 28 cards
+                    </span>
+                    <Button size="sm" variant="outline">
+                      View
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
     </div>

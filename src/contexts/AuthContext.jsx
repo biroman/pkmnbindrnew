@@ -9,18 +9,20 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   updatePassword,
-  sendEmailVerification,
   reauthenticateWithCredential,
   EmailAuthProvider,
   reload,
+  deleteUser,
 } from "firebase/auth";
 import { auth } from "../config/firebase";
 import {
   createUserProfile,
   getUserProfile,
   updateUserProfile,
+  deleteUserAccount,
 } from "../services/firestore";
 import { getFriendlyErrorMessage } from "../utils/errorMessages";
+import { firebaseSendEmailVerification } from "../utils/firebaseSendEmailVerification";
 
 // Create context
 const AuthContext = createContext({});
@@ -97,6 +99,12 @@ export function AuthProvider({ children }) {
       // Create user profile in Firestore
       await handleUserProfile(result.user, true);
 
+      // Send email verification
+      if (result.user) {
+        await sendVerificationEmail(result.user);
+        console.log("Verification email sent to:", result.user.email);
+      }
+
       return result;
     } catch (error) {
       throw error;
@@ -120,6 +128,15 @@ export function AuthProvider({ children }) {
         result.user.metadata.lastSignInTime;
       await handleUserProfile(result.user, isNewUser);
 
+      // Send verification email if new Google user and email is not yet verified
+      if (isNewUser && result.user && !result.user.emailVerified) {
+        await sendVerificationEmail(result.user);
+        console.log(
+          "Verification email sent to new Google user:",
+          result.user.email
+        );
+      }
+
       return result;
     } catch (error) {
       throw error;
@@ -138,7 +155,12 @@ export function AuthProvider({ children }) {
 
   // Reset password
   const resetPassword = (email) => {
-    return sendPasswordResetEmail(auth, email);
+    const actionCodeSettings = {
+      url: `${window.location.origin}/auth`, // Redirect back to login after password reset
+      handleCodeInApp: false, // Use our custom page instead of handling in-app
+    };
+
+    return sendPasswordResetEmail(auth, email, actionCodeSettings);
   };
 
   // Update user profile
@@ -186,22 +208,48 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (error) {
       console.error("Error changing password:", error);
-      return { success: false, error: error.message };
+
+      // Provide specific error messages for password change context
+      let friendlyMessage;
+      if (
+        error.code === "auth/invalid-credential" ||
+        error.code === "auth/wrong-password"
+      ) {
+        friendlyMessage =
+          "Current password is incorrect. Please verify your current password and try again.";
+      } else if (error.code === "auth/weak-password") {
+        friendlyMessage =
+          "New password is too weak. Please use at least 6 characters with a mix of letters and numbers.";
+      } else if (error.code === "auth/requires-recent-login") {
+        friendlyMessage =
+          "For security reasons, please sign out and sign in again before changing your password.";
+      } else {
+        friendlyMessage = getFriendlyErrorMessage(error);
+      }
+
+      return { success: false, error: friendlyMessage };
     }
   };
 
-  // Send email verification
-  const sendVerificationEmail = async () => {
-    if (!currentUser) {
-      throw new Error("No user logged in");
+  // Send email verification (accepts user to verify, defaults to currentUser)
+  const sendVerificationEmail = async (userToVerify = currentUser) => {
+    if (!userToVerify) {
+      console.error(
+        "sendVerificationEmail: No user provided or current user is null"
+      );
+      return { success: false, error: "No user to verify." };
     }
 
     try {
-      await sendEmailVerification(currentUser);
+      await firebaseSendEmailVerification(userToVerify);
+      console.log(
+        "Verification email sent via sendVerificationEmail function to:",
+        userToVerify.email
+      );
       return { success: true };
     } catch (error) {
       console.error("Error sending verification email:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: getFriendlyErrorMessage(error) };
     }
   };
 
@@ -225,6 +273,61 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error("Error refreshing user:", error);
       throw error;
+    }
+  };
+
+  // Delete user account completely
+  const deleteAccount = async (currentPassword) => {
+    if (!currentUser) {
+      throw new Error("No user logged in");
+    }
+
+    try {
+      // Re-authenticate user before deleting account for security
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(currentUser, credential);
+
+      const userId = currentUser.uid;
+
+      // Delete all user data from Firestore first
+      const firestoreResult = await deleteUserAccount(userId);
+      if (!firestoreResult.success) {
+        throw new Error(firestoreResult.error);
+      }
+
+      // Delete the Firebase Auth user
+      await deleteUser(currentUser);
+
+      // Clear local state
+      setCurrentUser(null);
+      setUserProfile(null);
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting account:", error);
+
+      // Provide specific error messages for account deletion context
+      let friendlyMessage;
+      if (
+        error.code === "auth/invalid-credential" ||
+        error.code === "auth/wrong-password"
+      ) {
+        friendlyMessage =
+          "Current password is incorrect. Please verify your password and try again.";
+      } else if (error.code === "auth/requires-recent-login") {
+        friendlyMessage =
+          "For security reasons, please sign out and sign in again before deleting your account.";
+      } else if (error.code === "auth/user-not-found") {
+        friendlyMessage =
+          "Account not found. Please refresh the page and try again.";
+      } else {
+        friendlyMessage = getFriendlyErrorMessage(error);
+      }
+
+      return { success: false, error: friendlyMessage };
     }
   };
 
@@ -297,6 +400,7 @@ export function AuthProvider({ children }) {
     sendVerificationEmail,
     isEmailVerified,
     refreshUser,
+    deleteAccount,
     getUserRole,
     isOwner,
     isUser,
@@ -306,8 +410,6 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {!loading && children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }

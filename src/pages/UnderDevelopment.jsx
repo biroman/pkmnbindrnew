@@ -95,7 +95,7 @@ const UnderDevelopment = () => {
               <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full w-2/5 animate-pulse"></div>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-300">
-              45% Complete
+              60% Complete
             </p>
           </div>
         </div>

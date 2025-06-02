@@ -6,6 +6,7 @@ import AccountSection from "../components/profile/sections/AccountSection";
 import AdminSection from "../components/profile/sections/AdminSection";
 import BinderPreferencesSection from "../components/profile/sections/BinderPreferencesSection";
 import PrivacySharingSection from "../components/profile/sections/PrivacySharingSection";
+import InterfaceSection from "../components/profile/sections/InterfaceSection";
 
 const Profile = () => {
   const {
@@ -101,6 +102,8 @@ const Profile = () => {
             isOwner={isOwner}
           />
         );
+      case "interface":
+        return <InterfaceSection />;
       default:
         return (
           <div className="space-y-6">

@@ -8,6 +8,7 @@ import {
   Share2,
   Image,
   Bell,
+  Monitor,
 } from "lucide-react";
 
 const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
@@ -29,6 +30,12 @@ const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
       name: "Binder Preferences",
       description: "Default settings for creating and displaying binders",
       icon: Settings2,
+    },
+    {
+      id: "interface",
+      name: "Interface",
+      description: "Animation preferences and UI behavior settings",
+      icon: Monitor,
     },
     {
       id: "privacy-sharing",

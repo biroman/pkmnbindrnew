@@ -11,6 +11,12 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner";
     }
 
+    // System Configuration - only owners can write, anyone can read
+    match /systemConfiguration/{configId} {
+      allow read: if true;  // Everyone needs to read limits
+      allow write: if isOwner();
+    }
+
     // Users collection - allow owners to read for admin purposes
     match /users/{userId} {
       // Users can read/write their own data

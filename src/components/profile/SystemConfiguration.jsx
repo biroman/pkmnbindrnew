@@ -46,8 +46,48 @@ import {
   Input,
   Label,
 } from "../ui";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { db } from "../../config/firebase";
+import { useAuth } from "../../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const SystemConfiguration = () => {
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [isOwner, setIsOwner] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if user is owner
+  useEffect(() => {
+    const checkOwnerStatus = async () => {
+      if (!currentUser) {
+        navigate("/");
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const hasOwnerRole = userData.role === "owner";
+          setIsOwner(hasOwnerRole);
+          if (!hasOwnerRole) {
+            navigate("/");
+          }
+        } else {
+          navigate("/");
+        }
+      } catch (error) {
+        console.error("Error checking owner status:", error);
+        navigate("/");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkOwnerStatus();
+  }, [currentUser, navigate]);
+
   // State for limit enforcement configuration
   const [limitConfig, setLimitConfig] = useState({
     ENFORCE_BINDER_LIMITS: false,
@@ -62,10 +102,12 @@ const SystemConfiguration = () => {
     guest: {
       maxBinders: 3,
       maxCardsPerBinder: 50,
+      maxPages: 10,
     },
     registered: {
       maxBinders: 25,
       maxCardsPerBinder: 400,
+      maxPages: 50,
     },
   });
 
@@ -130,28 +172,53 @@ const SystemConfiguration = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
 
-  // Mock function to load current configuration
-  const loadConfiguration = async () => {
-    // In a real app, this would fetch from your backend/Firebase
-    console.log("Loading system configuration...");
-    // For now, using the default values set in state
-  };
+  // Load current configuration
+  useEffect(() => {
+    const loadConfiguration = async () => {
+      try {
+        const configRef = doc(db, "systemConfiguration", "limits");
+        const configDoc = await getDoc(configRef);
 
-  // Mock function to save configuration
+        if (configDoc.exists()) {
+          const data = configDoc.data();
+          setUserLimits((prev) => ({
+            ...prev,
+            guest: {
+              ...prev.guest,
+              maxPages: data.guestMaxPages || prev.guest.maxPages,
+            },
+            registered: {
+              ...prev.registered,
+              maxPages: data.registeredMaxPages || prev.registered.maxPages,
+            },
+          }));
+        }
+      } catch (error) {
+        console.error("Error loading configuration:", error);
+      }
+    };
+
+    loadConfiguration();
+  }, []);
+
+  // Save configuration
   const saveConfiguration = async () => {
+    if (!isOwner) {
+      console.error("Unauthorized: User is not an owner");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // In a real app, this would save to your backend/Firebase
-      console.log("Saving configuration:", {
-        limitConfig,
-        userLimits,
-        warningThresholds,
-        featureFlags,
-        performanceSettings,
-      });
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const configRef = doc(db, "systemConfiguration", "limits");
+      await setDoc(
+        configRef,
+        {
+          guestMaxPages: userLimits.guest.maxPages,
+          registeredMaxPages: userLimits.registered.maxPages,
+        },
+        { merge: true }
+      );
 
       setHasUnsavedChanges(false);
       setLastSaved(new Date());
@@ -181,9 +248,17 @@ const SystemConfiguration = () => {
     }
   };
 
-  useEffect(() => {
-    loadConfiguration();
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (!isOwner) {
+    return null; // The useEffect will handle navigation
+  }
 
   return (
     <TooltipProvider>
@@ -491,6 +566,29 @@ const SystemConfiguration = () => {
                           className="w-full"
                         />
                       </div>
+
+                      <div className="space-y-2">
+                        <Label>
+                          Max Pages per Binder: {userLimits.guest.maxPages}
+                        </Label>
+                        <Slider
+                          value={[userLimits.guest.maxPages]}
+                          onValueChange={([value]) => {
+                            setUserLimits((prev) => ({
+                              ...prev,
+                              guest: {
+                                ...prev.guest,
+                                maxPages: value,
+                              },
+                            }));
+                            markChanges();
+                          }}
+                          max={50}
+                          min={1}
+                          step={1}
+                          className="w-full"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -543,6 +641,29 @@ const SystemConfiguration = () => {
                           max={1000}
                           min={100}
                           step={50}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>
+                          Max Pages per Binder: {userLimits.registered.maxPages}
+                        </Label>
+                        <Slider
+                          value={[userLimits.registered.maxPages]}
+                          onValueChange={([value]) => {
+                            setUserLimits((prev) => ({
+                              ...prev,
+                              registered: {
+                                ...prev.registered,
+                                maxPages: value,
+                              },
+                            }));
+                            markChanges();
+                          }}
+                          max={200}
+                          min={10}
+                          step={5}
                           className="w-full"
                         />
                       </div>

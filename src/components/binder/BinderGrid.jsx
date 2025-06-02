@@ -1,38 +1,55 @@
 import BinderCardSlot from "./BinderCardSlot";
+import { parseGridSize } from "../../utils/gridUtils";
 
 /**
- * BinderGrid - Responsive 3x3 grid component for Pokemon card binder
+ * BinderGrid - Flexible grid component for Pokemon card binder
  * @param {Object} gridDimensions - Grid dimensions object from useGridDimensions hook
+ * @param {string} gridSize - Grid size string like "3x3", "4x3", etc.
  * @param {Function} onAddCard - Callback function when a card slot is clicked
+ * @param {number} startingSlot - Starting slot number (for dual-page layouts)
+ * @param {string} pageType - Type of page ("left", "right", or "single")
  */
-const BinderGrid = ({ gridDimensions, onAddCard }) => {
-  // Create array for 3x3 grid (9 slots)
-  const gridSlots = Array.from({ length: 9 }, (_, index) => index + 1);
+const BinderGrid = ({
+  gridDimensions,
+  gridSize = "3x3",
+  onAddCard,
+  startingSlot = 1,
+  pageType = "single",
+  ...props
+}) => {
+  const { cols, rows, totalSlots } = parseGridSize(gridSize);
+
+  // Create array for dynamic grid slots
+  const gridSlots = Array.from(
+    { length: totalSlots },
+    (_, index) => startingSlot + index
+  );
 
   return (
-    <div className="flex-1 h-full p-4 overflow-hidden">
-      <div className="h-full flex justify-center items-center">
-        {/* Responsive 3x3 Grid */}
-        <div
-          className="grid grid-cols-3 grid-rows-3"
-          style={{
-            width: `${gridDimensions.gridWidth}px`,
-            height: `${gridDimensions.gridHeight}px`,
-            gap: `${gridDimensions.gap}px`,
-            maxWidth: "95vw",
-            maxHeight: "95vh",
-          }}
-        >
-          {gridSlots.map((slot) => (
-            <BinderCardSlot
-              key={slot}
-              slot={slot}
-              cardWidth={gridDimensions.cardWidth}
-              cardHeight={gridDimensions.cardHeight}
-              onAddCard={onAddCard}
-            />
-          ))}
-        </div>
+    <div className="flex flex-col items-center justify-center h-full p-2">
+      {/* Grid container */}
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+          width: `${gridDimensions.gridWidth}px`,
+          height: `${gridDimensions.gridHeight}px`,
+          gap: `${gridDimensions.gap}px`,
+          maxWidth: "95vw",
+          maxHeight: "95vh",
+        }}
+      >
+        {gridSlots.map((slot) => (
+          <BinderCardSlot
+            key={slot}
+            slot={slot}
+            cardWidth={gridDimensions.cardWidth}
+            cardHeight={gridDimensions.cardHeight}
+            onAddCard={onAddCard}
+            {...props}
+          />
+        ))}
       </div>
     </div>
   );

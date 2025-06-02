@@ -13,6 +13,8 @@ import AppLayout from "../components/layout/AppLayout";
 // EAGER LOAD - Core pages for instant access (no loading delay)
 import WelcomeDashboard from "../components/dashboard/WelcomeDashboard";
 import Collections from "../pages/Collections";
+import BinderDashboard from "../pages/BinderDashboard";
+import BinderCreationWizard from "../pages/BinderCreationWizard";
 import Binder from "../pages/Binder";
 import Collection from "../pages/Collection";
 import AddCard from "../pages/AddCard";
@@ -154,7 +156,11 @@ export const router = createBrowserRouter([
       // Individual Binder Create/Edit - EAGER LOADED (core feature)
       {
         path: "binder",
-        element: <Binder />,
+        element: <BinderDashboard />,
+      },
+      {
+        path: "binder/new",
+        element: <BinderCreationWizard />,
       },
       {
         path: "binder/:binderId",

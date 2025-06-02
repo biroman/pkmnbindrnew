@@ -7,6 +7,7 @@ import {
   Save,
   Check,
   Palette,
+  Layout,
 } from "lucide-react";
 import {
   Card,
@@ -128,6 +129,92 @@ const GridPreviewCard = ({ size, isSelected, onClick, label }) => {
   );
 };
 
+const WorkspaceLayoutCard = ({
+  layout,
+  isSelected,
+  onClick,
+  label,
+  description,
+}) => {
+  return (
+    <div
+      className={`relative cursor-pointer transition-all duration-200 border-2 rounded-lg p-3 hover:shadow-md ${
+        isSelected
+          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+          : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+      }`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      aria-label={`Select ${label} workspace layout`}
+    >
+      {/* Selection indicator */}
+      {isSelected && (
+        <div className="absolute -top-2.5 -right-2.5 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center z-10 shadow">
+          <Check className="h-3 w-3" />
+        </div>
+      )}
+
+      {/* Layout preview */}
+      <div className="flex flex-col items-center space-y-2.5">
+        <div className="w-20 h-12 bg-slate-200 dark:bg-slate-700 rounded-md p-1 flex items-stretch gap-1 shadow-inner overflow-hidden">
+          {layout === "sidebar-right" ? (
+            // Classic Layout: Toolbar Left, Sidebar Right
+            <>
+              <div className="flex-none w-3 bg-blue-500 dark:bg-blue-600 rounded-sm flex flex-col items-center justify-center space-y-0.5 py-1">
+                <div className="w-1 h-1 bg-white/80 rounded-full"></div>
+                <div className="w-1 h-1 bg-white/80 rounded-full"></div>
+                <div className="w-1 h-1 bg-white/80 rounded-full"></div>
+              </div>
+              <div className="flex-grow bg-slate-50 dark:bg-slate-800/70 rounded-sm"></div>
+              <div className="flex-none w-5 bg-slate-400 dark:bg-slate-500 rounded-sm"></div>
+            </>
+          ) : (
+            // Reversed Layout: Sidebar Left, Toolbar Right
+            <>
+              <div className="flex-none w-5 bg-slate-400 dark:bg-slate-500 rounded-sm"></div>
+              <div className="flex-grow bg-slate-50 dark:bg-slate-800/70 rounded-sm"></div>
+              <div className="flex-none w-3 bg-blue-500 dark:bg-blue-600 rounded-sm flex flex-col items-center justify-center space-y-0.5 py-1">
+                <div className="w-1 h-1 bg-white/80 rounded-full"></div>
+                <div className="w-1 h-1 bg-white/80 rounded-full"></div>
+                <div className="w-1 h-1 bg-white/80 rounded-full"></div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Label */}
+        <div className="text-center">
+          <p
+            className={`text-sm font-medium ${
+              isSelected
+                ? "text-blue-700 dark:text-blue-300"
+                : "text-gray-700 dark:text-gray-400"
+            }`}
+          >
+            {label}
+          </p>
+          <p
+            className={`text-xs ${
+              isSelected
+                ? "text-blue-600 dark:text-blue-300"
+                : "text-gray-500 dark:text-gray-500"
+            }`}
+          >
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BinderPreferencesSection = () => {
   const { currentUser } = useAuth();
   const [preferences, setPreferences] = useState({
@@ -135,6 +222,7 @@ const BinderPreferencesSection = () => {
     sortingDirection: true, // true = ascending, false = descending
     autoSave: true,
     theme: "light", // Default theme
+    workspaceLayout: "sidebar-right", // New setting: "sidebar-right" or "sidebar-left"
   });
   const [initialPreferences, setInitialPreferences] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -147,6 +235,19 @@ const BinderPreferencesSection = () => {
     { value: "3x3", label: "3×3 Grid" },
     { value: "4x3", label: "4×3 Grid" },
     { value: "4x4", label: "4×4 Grid" },
+  ];
+
+  const layoutOptions = [
+    {
+      value: "sidebar-right",
+      label: "Classic Layout",
+      description: "Sidebar right, toolbar left",
+    },
+    {
+      value: "sidebar-left",
+      label: "Reversed Layout",
+      description: "Sidebar left, toolbar right",
+    },
   ];
 
   const themeOptions = [
@@ -172,10 +273,11 @@ const BinderPreferencesSection = () => {
         const result = await getUserPreferences(currentUser.uid);
 
         if (result.success) {
-          // Add theme to the loaded preferences with fallback
+          // Add theme and workspaceLayout to the loaded preferences with fallbacks
           const loadedPreferences = {
             ...result.data,
             theme: result.data.theme || "light",
+            workspaceLayout: result.data.workspaceLayout || "sidebar-right",
           };
           setPreferences(loadedPreferences);
           setInitialPreferences(loadedPreferences);
@@ -285,6 +387,40 @@ const BinderPreferencesSection = () => {
             <AlertDescription>{alert.message}</AlertDescription>
           </Alert>
         )}
+        {/* Workspace Layout Setting */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Layout className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2" />
+              Workspace Layout
+            </CardTitle>
+            <Label className="text-sm text-gray-500 dark:text-gray-400">
+              Choose where to position the sidebar and toolbar in your
+              workspace.
+            </Label>
+          </CardHeader>
+          <CardContent>
+            <FormField>
+              <Label className="mb-4 block">
+                Select your preferred workspace layout
+              </Label>
+              <div className="grid grid-cols-2 gap-4">
+                {layoutOptions.map((option) => (
+                  <WorkspaceLayoutCard
+                    key={option.value}
+                    layout={option.value}
+                    label={option.label}
+                    description={option.description}
+                    isSelected={preferences.workspaceLayout === option.value}
+                    onClick={() =>
+                      updatePreference("workspaceLayout", option.value)
+                    }
+                  />
+                ))}
+              </div>
+            </FormField>
+          </CardContent>
+        </Card>
 
         {/* Grid Size Setting */}
         <Card>

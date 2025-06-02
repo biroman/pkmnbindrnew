@@ -46,6 +46,7 @@ export const createUserProfile = async (userId, userData) => {
         theme: "light",
         currency: "USD",
         publicProfile: false,
+        animationPreference: null, // null = follow system preference
         binderPreferences: {
           gridSize: "3x3",
           sortingDirection: true, // true = ascending
@@ -106,14 +107,30 @@ export const updateUserPreferences = async (userId, preferences) => {
       lastLoginAt: serverTimestamp(),
     };
 
-    // Add each preference as a nested field update
-    Object.keys(preferences).forEach((key) => {
-      updateData[`settings.binderPreferences.${key}`] = preferences[key];
+    // Remove currentPage from preferences before saving
+    const { currentPage, ...prefsToSave } = preferences;
+
+    // Handle different types of preferences
+    Object.keys(prefsToSave).forEach((key) => {
+      if (key === "animationPreference") {
+        // Animation preference is stored directly in settings
+        updateData[`settings.${key}`] = prefsToSave[key];
+      } else {
+        // Other preferences go into binderPreferences
+        updateData[`settings.binderPreferences.${key}`] = prefsToSave[key];
+      }
     });
-    updateData[`settings.binderPreferences.updatedAt`] = serverTimestamp();
+
+    // Update timestamp based on preference type
+    if (prefsToSave.animationPreference !== undefined) {
+      updateData[`settings.updatedAt`] = serverTimestamp();
+    }
+    if (Object.keys(prefsToSave).some((key) => key !== "animationPreference")) {
+      updateData[`settings.binderPreferences.updatedAt`] = serverTimestamp();
+    }
 
     await updateDoc(userDocRef, updateData);
-    return { success: true, data: preferences };
+    return { success: true, data: prefsToSave };
   } catch (error) {
     console.error("Error updating user preferences:", error);
     return { success: false, error: getFriendlyErrorMessage(error) };
@@ -127,18 +144,25 @@ export const getUserPreferences = async (userId) => {
 
     if (docSnap.exists()) {
       const userData = docSnap.data();
-      const preferences = userData.settings?.binderPreferences || {};
+      const binderPreferences = userData.settings?.binderPreferences || {};
+      const animationPreference = userData.settings?.animationPreference;
 
       // Return default preferences if none exist
       const defaultPreferences = {
         gridSize: "3x3",
         sortingDirection: true, // true = ascending
         autoSave: true,
+        animationPreference: null, // null = follow system preference
       };
 
       return {
         success: true,
-        data: { ...defaultPreferences, ...preferences },
+        data: {
+          ...defaultPreferences,
+          ...binderPreferences,
+          animationPreference:
+            animationPreference !== undefined ? animationPreference : null,
+        },
       };
     } else {
       return { success: false, error: "User profile not found" };

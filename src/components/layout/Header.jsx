@@ -124,7 +124,7 @@ const Header = () => {
 
   return (
     <TooltipProvider>
-      <header className="w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 relative z-30">
+      <header className="w-full bg-white dark:bg-gray-800 shadow-[inset_0_-1px_0_0_rgb(229_231_235)] dark:shadow-[inset_0_-1px_0_0_rgb(75_85_99)] transition-colors duration-200 relative z-30">
         <div className="w-full flex justify-between items-center h-16">
           {/* Left side - Logo + Title */}
           <div className="flex items-center">

@@ -1,5 +1,6 @@
 import { RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { AnimationProvider } from "./contexts/AnimationContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { StorageProvider } from "./storage/StorageProvider";
 import { router } from "./router";
@@ -9,9 +10,11 @@ const App = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <StorageProvider>
-          <RouterProvider router={router} />
-        </StorageProvider>
+        <AnimationProvider>
+          <StorageProvider>
+            <RouterProvider router={router} />
+          </StorageProvider>
+        </AnimationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

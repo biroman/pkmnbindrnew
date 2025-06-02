@@ -242,7 +242,7 @@ const SystemConfiguration = () => {
         </div>
 
         {/* Warning Alert */}
-        <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-900/20">
+        <Alert className="flex flex-row items-center gap-2 border-amber-200 bg-amber-50 dark:bg-amber-900/20">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800 dark:text-amber-200">
             <strong>Warning:</strong> Changes to system configuration will

@@ -22,7 +22,7 @@ import {
   LogIn,
   UserPlus,
   Lock,
-  HardDrive,
+  UserX,
   Cloud,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
@@ -161,18 +161,51 @@ const Header = () => {
 
           {/* Center - Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
-            {/* Primary Action */}
-            <NavLink
-              to={primaryAction.href}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
-                location.pathname === primaryAction.href
-                  ? "bg-blue-700"
-                  : "hover:bg-blue-700"
-              }`}
-            >
-              <Plus className="h-4 w-4" />
-              <span>{primaryAction.name}</span>
-            </NavLink>
+            {/* Primary Action with Guest Info */}
+            <div className="flex items-center space-x-2">
+              <NavLink
+                to={primaryAction.href}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
+                  location.pathname === primaryAction.href
+                    ? "bg-blue-700"
+                    : "hover:bg-blue-700"
+                }`}
+              >
+                <Plus className="h-4 w-4" />
+                <span>{primaryAction.name}</span>
+              </NavLink>
+
+              {/* Subtle Guest Mode Info Badge */}
+              {!currentUser && (
+                <div className="relative">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center space-x-1 px-2 py-1 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-md cursor-help">
+                        <UserX className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                          Guest mode
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      align="center"
+                      className="z-50 max-w-xs"
+                      sideOffset={5}
+                    >
+                      <p className="text-sm select-none">
+                        Your binder is saved locally on this device.
+                        <br />
+                        <Link to="/auth?mode=signup" className="text-blue-400">
+                          Sign up
+                        </Link>{" "}
+                        to sync across devices and share with friends.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+            </div>
 
             {/* All Navigation Items */}
             {navigationItems.map((item) => {
@@ -335,23 +368,37 @@ const Header = () => {
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <nav className="px-4 py-2 space-y-1">
-              {/* Primary Action */}
-              <NavLink
-                to={primaryAction.href}
-                onClick={(e) => {
-                  if (e.target.tagName === "A") {
-                    setIsMobileMenuOpen(false);
-                  }
-                }}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
-                  location.pathname === primaryAction.href
-                    ? "bg-blue-700"
-                    : "hover:bg-blue-700"
-                }`}
-              >
-                <Plus className="h-5 w-5" />
-                <span>{primaryAction.name}</span>
-              </NavLink>
+              {/* Primary Action with Guest Info */}
+              <div className="space-y-2">
+                <NavLink
+                  to={primaryAction.href}
+                  onClick={(e) => {
+                    if (e.target.tagName === "A") {
+                      setIsMobileMenuOpen(false);
+                    }
+                  }}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
+                    location.pathname === primaryAction.href
+                      ? "bg-blue-700"
+                      : "hover:bg-blue-700"
+                  }`}
+                >
+                  <Plus className="h-5 w-5" />
+                  <span>{primaryAction.name}</span>
+                </NavLink>
+
+                {/* Mobile Guest Mode Info */}
+                {!currentUser && (
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-center space-x-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-md">
+                      <UserX className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                      <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                        Guest mode • Sign up for cloud sync
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* All Navigation Items */}
               {navigationItems.map((item) => {
@@ -427,37 +474,6 @@ const Header = () => {
                 </div>
               )}
             </nav>
-          </div>
-        )}
-
-        {/* Guest Notification Banner - appears on binder page for anonymous users */}
-        {!currentUser && isOnBinderPage && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center space-x-2 text-amber-800 dark:text-amber-200">
-                  <HardDrive className="h-4 w-4" />
-                  <span>
-                    <strong>Guest mode:</strong> Your binder is saved locally.
-                    <span className="hidden sm:inline">
-                      {" "}
-                      Sign up to sync across devices and share with friends.
-                    </span>
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    onClick={handleSignUp}
-                    size="sm"
-                    variant="outline"
-                    className="border-amber-600 text-amber-700 hover:bg-amber-600 hover:text-white dark:border-amber-400 dark:text-amber-300"
-                  >
-                    <Cloud className="h-3 w-3 mr-1" />
-                    Upgrade
-                  </Button>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </header>

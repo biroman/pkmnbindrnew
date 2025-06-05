@@ -1,5 +1,6 @@
 // Core UI Components
 export { default as Button } from "./Button";
+export { SaveButton } from "./SaveButton";
 export { default as Badge } from "./Badge";
 export {
   Card,
@@ -23,6 +24,7 @@ export { default as RoleGuard } from "./RoleGuard";
 export { Switch } from "./Switch";
 export { Slider } from "./Slider";
 export { Separator } from "./Separator";
+export { default as Modal } from "./Modal";
 
 // Radix UI Components
 export {

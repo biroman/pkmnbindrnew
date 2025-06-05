@@ -12,8 +12,7 @@ import AppLayout from "../components/layout/AppLayout";
 
 // EAGER LOAD - Core pages for instant access (no loading delay)
 import WelcomeDashboard from "../components/dashboard/WelcomeDashboard";
-import Collections from "../pages/Collections";
-import BinderDashboard from "../pages/BinderDashboard";
+import BinderListPage from "../pages/BinderListPage";
 import BinderCreationWizard from "../pages/BinderCreationWizard";
 import Binder from "../pages/Binder";
 import Collection from "../pages/Collection";
@@ -133,8 +132,12 @@ export const router = createBrowserRouter([
 
       // Collection management - EAGER LOADED (core features)
       {
-        path: "collection",
-        element: <Collection />,
+        path: "collections",
+        element: (
+          <ProtectedRoute>
+            <BinderListPage />
+          </ProtectedRoute>
+        ),
       },
 
       // Add new card - EAGER LOADED (frequently used)
@@ -148,16 +151,12 @@ export const router = createBrowserRouter([
         path: "collections",
         element: (
           <ProtectedRoute>
-            <Collections />
+            <BinderListPage />
           </ProtectedRoute>
         ),
       },
 
       // Individual Binder Create/Edit - EAGER LOADED (core feature)
-      {
-        path: "binder",
-        element: <BinderDashboard />,
-      },
       {
         path: "binder/new",
         element: <BinderCreationWizard />,

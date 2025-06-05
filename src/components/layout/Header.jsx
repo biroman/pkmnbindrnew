@@ -27,14 +27,34 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation, NavLink, Link } from "react-router-dom";
+import { useUserLimits } from "../../hooks/useUserLimits";
+import { useQuery } from "@tanstack/react-query";
+import { getBindersForUser } from "../../services/firestore";
 
 const Header = () => {
   const { currentUser, userProfile, logout, loading, isOwner } = useAuth();
+  const { canCreateBinder, limits } = useUserLimits();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch current binder count to check limits
+  const { data: bindersData } = useQuery({
+    queryKey: ["userBinders", currentUser?.uid],
+    queryFn: () => {
+      if (!currentUser?.uid) {
+        return Promise.resolve({ success: false, binders: [] });
+      }
+      return getBindersForUser(currentUser.uid);
+    },
+    enabled: !!currentUser?.uid,
+  });
+
+  const currentBinderCount = bindersData?.binders?.length || 0;
+  const canCreate = canCreateBinder(currentBinderCount);
+  const isAtLimit = !canCreate && limits.maxBinders !== Number.MAX_SAFE_INTEGER;
 
   // Check if user is on binder page
   const isOnBinderPage = location.pathname.startsWith("/app/binder");
@@ -42,7 +62,7 @@ const Header = () => {
   // Primary action for all users
   const primaryAction = {
     name: currentUser ? "Create Binder" : "Start Creating",
-    href: "/app/binder",
+    href: "/app/binder/new",
     icon: Plus,
     isPrimary: true,
   };
@@ -163,17 +183,45 @@ const Header = () => {
           <nav className="hidden lg:flex items-center space-x-8">
             {/* Primary Action with Guest Info */}
             <div className="flex items-center space-x-2">
-              <NavLink
-                to={primaryAction.href}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
-                  location.pathname === primaryAction.href
-                    ? "bg-blue-700"
-                    : "hover:bg-blue-700"
-                }`}
-              >
-                <Plus className="h-4 w-4" />
-                <span>{primaryAction.name}</span>
-              </NavLink>
+              {/* Create Binder Button with Limit Checking */}
+              {isAtLimit ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-bold bg-gray-400 text-gray-600 cursor-not-allowed transition-colors duration-200 shadow-sm">
+                      <Plus className="h-4 w-4" />
+                      <span>{primaryAction.name}</span>
+                      <Lock className="h-3 w-3 ml-1" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    align="center"
+                    className="z-50 max-w-xs"
+                    sideOffset={5}
+                  >
+                    <p className="text-sm select-none">
+                      Binder limit reached ({currentBinderCount}/
+                      {limits.maxBinders}).
+                      <br />
+                      {currentUser
+                        ? "Consider organizing your existing binders."
+                        : "Sign up for more binders!"}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <NavLink
+                  to={primaryAction.href}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
+                    location.pathname === primaryAction.href
+                      ? "bg-blue-700"
+                      : "hover:bg-blue-700"
+                  }`}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{primaryAction.name}</span>
+                </NavLink>
+              )}
 
               {/* Subtle Guest Mode Info Badge */}
               {!currentUser && (
@@ -370,22 +418,31 @@ const Header = () => {
             <nav className="px-4 py-2 space-y-1">
               {/* Primary Action with Guest Info */}
               <div className="space-y-2">
-                <NavLink
-                  to={primaryAction.href}
-                  onClick={(e) => {
-                    if (e.target.tagName === "A") {
-                      setIsMobileMenuOpen(false);
-                    }
-                  }}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
-                    location.pathname === primaryAction.href
-                      ? "bg-blue-700"
-                      : "hover:bg-blue-700"
-                  }`}
-                >
-                  <Plus className="h-5 w-5" />
-                  <span>{primaryAction.name}</span>
-                </NavLink>
+                {/* Create Binder Button with Limit Checking - Mobile */}
+                {isAtLimit ? (
+                  <div className="flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-gray-400 text-gray-600 cursor-not-allowed transition-colors duration-200 shadow-sm">
+                    <Plus className="h-5 w-5" />
+                    <span>{primaryAction.name}</span>
+                    <Lock className="h-3 w-3 ml-1" />
+                  </div>
+                ) : (
+                  <NavLink
+                    to={primaryAction.href}
+                    onClick={(e) => {
+                      if (e.target.tagName === "A") {
+                        setIsMobileMenuOpen(false);
+                      }
+                    }}
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-200 shadow-sm ${
+                      location.pathname === primaryAction.href
+                        ? "bg-blue-700"
+                        : "hover:bg-blue-700"
+                    }`}
+                  >
+                    <Plus className="h-5 w-5" />
+                    <span>{primaryAction.name}</span>
+                  </NavLink>
+                )}
 
                 {/* Mobile Guest Mode Info */}
                 {!currentUser && (
@@ -394,6 +451,19 @@ const Header = () => {
                       <UserX className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                       <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">
                         Guest mode • Sign up for cloud sync
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mobile Limit Info */}
+                {isAtLimit && (
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-center space-x-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-md">
+                      <Lock className="h-3 w-3 text-red-600 dark:text-red-400" />
+                      <span className="text-xs text-red-700 dark:text-red-300 font-medium">
+                        Binder limit reached ({currentBinderCount}/
+                        {limits.maxBinders})
                       </span>
                     </div>
                   </div>

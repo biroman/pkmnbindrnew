@@ -357,7 +357,7 @@ const AccountSection = ({
                 </div>
                 <Tooltip>
                   <TooltipTrigger>
-                    {isEmailVerified() ? (
+                    {isEmailVerified && isEmailVerified() ? (
                       <CheckCircle className="h-4 w-4 text-green-500" />
                     ) : (
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -365,7 +365,7 @@ const AccountSection = ({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>
-                      {isEmailVerified()
+                      {isEmailVerified && isEmailVerified()
                         ? "Email verified"
                         : "Email verification pending"}
                     </p>

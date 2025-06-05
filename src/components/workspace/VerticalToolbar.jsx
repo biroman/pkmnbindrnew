@@ -1,4 +1,13 @@
-import { Undo2, Redo2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Undo2,
+  Redo2,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Clipboard,
+  History,
+  LayoutGrid,
+} from "lucide-react";
 import { Button } from "../ui";
 
 /**
@@ -6,7 +15,11 @@ import { Button } from "../ui";
  * Follows Photoshop/Figma design tool pattern
  * @param {Function} onUndo - Undo action handler
  * @param {Function} onRedo - Redo action handler
+ * @param {Function} onToggleHistoryPanel - Handler to toggle the history panel
+ * @param {Function} onToggleOverviewMode - Handler to toggle the binder overview mode
+ * @param {boolean} isOverviewModeActive - Whether overview mode is currently active
  * @param {Function} onAddCards - Add cards action handler
+ * @param {Function} onClipboard - Clipboard action handler
  * @param {Function} onPreviousPage - Previous page handler
  * @param {Function} onNextPage - Next page handler
  * @param {boolean} canUndo - Whether undo is available
@@ -18,7 +31,11 @@ import { Button } from "../ui";
 const VerticalToolbar = ({
   onUndo,
   onRedo,
+  onToggleHistoryPanel,
+  onToggleOverviewMode,
+  isOverviewModeActive,
   onAddCards,
+  onClipboard,
   onPreviousPage,
   onNextPage,
   canUndo = false,
@@ -61,6 +78,37 @@ const VerticalToolbar = ({
           <Redo2 className="h-5 w-5" />
         </Button>
 
+        {/* History Panel Toggle Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleHistoryPanel}
+          disabled={disabled}
+          className="h-10 w-10 p-0 rounded-xl transition-all duration-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 hover:scale-110"
+          title="View Edit History"
+        >
+          <History className="h-5 w-5" />
+        </Button>
+
+        {/* Divider */}
+        <div className="w-6 h-px bg-gray-300 dark:bg-gray-600 my-1"></div>
+
+        {/* Overview Mode Toggle Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleOverviewMode}
+          className={`h-10 w-10 p-0 rounded-xl transition-all duration-200 hover:scale-110 
+            ${
+              isOverviewModeActive
+                ? "bg-teal-100 dark:bg-teal-700 text-teal-700 dark:text-teal-200"
+                : "hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-600 dark:hover:text-teal-400"
+            }`}
+          title="Toggle Page Overview"
+        >
+          <LayoutGrid className="h-5 w-5" />
+        </Button>
+
         {/* Divider */}
         <div className="w-6 h-px bg-gray-300 dark:bg-gray-600 my-1"></div>
 
@@ -72,6 +120,18 @@ const VerticalToolbar = ({
           title="Add Cards"
         >
           <Plus className="h-5 w-5" />
+        </Button>
+
+        {/* Clipboard Action */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClipboard}
+          disabled={disabled}
+          className="h-10 w-10 p-0 rounded-xl transition-all duration-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 hover:scale-110"
+          title="Clipboard"
+        >
+          <Clipboard className="h-5 w-5" />
         </Button>
 
         {/* Divider */}

@@ -253,6 +253,7 @@ const SignupForm = ({ onToggleMode }) => {
                 onBlur={() => handleBlur("displayName")}
                 placeholder="Enter your display name"
                 className={validationErrors.displayName ? "border-red-500" : ""}
+                maxLength={50}
                 required
               />
               {validationErrors.displayName && (
@@ -271,6 +272,7 @@ const SignupForm = ({ onToggleMode }) => {
                 onBlur={() => handleBlur("email")}
                 placeholder="Enter your email"
                 className={validationErrors.email ? "border-red-500" : ""}
+                maxLength={100}
                 required
               />
               {validationErrors.email && (

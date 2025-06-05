@@ -29,6 +29,7 @@ import {
   CardTitle,
   CardContent,
   Button,
+  SaveButton,
   Switch,
   Slider,
   Badge,
@@ -119,6 +120,16 @@ const SystemConfiguration = () => {
     API_WARNING: 90,
   });
 
+  // State for save rate limiting
+  const [saveRateLimits, setSaveRateLimits] = useState({
+    guestSavesPerMinute: 3,
+    guestSavesPerHour: 15,
+    registeredSavesPerMinute: 10,
+    registeredSavesPerHour: 60,
+    saveCooldownSeconds: 2,
+    enforceSaveRateLimits: false,
+  });
+
   // State for feature flags (mockup for future features)
   const [featureFlags, setFeatureFlags] = useState({
     // Current Phase 1 features
@@ -181,25 +192,80 @@ const SystemConfiguration = () => {
 
         if (configDoc.exists()) {
           const data = configDoc.data();
+
+          // Load user limits
           setUserLimits((prev) => ({
-            ...prev,
             guest: {
-              ...prev.guest,
+              maxBinders: data.guestMaxBinders || prev.guest.maxBinders,
+              maxCardsPerBinder:
+                data.guestMaxCardsPerBinder || prev.guest.maxCardsPerBinder,
               maxPages: data.guestMaxPages || prev.guest.maxPages,
             },
             registered: {
-              ...prev.registered,
+              maxBinders:
+                data.registeredMaxBinders || prev.registered.maxBinders,
+              maxCardsPerBinder:
+                data.registeredMaxCardsPerBinder ||
+                prev.registered.maxCardsPerBinder,
               maxPages: data.registeredMaxPages || prev.registered.maxPages,
             },
           }));
+
+          // Load enforcement flags
+          if (
+            data.enforceBinnerLimits !== undefined ||
+            data.enforceCardLimits !== undefined
+          ) {
+            setLimitConfig((prev) => ({
+              ENFORCE_BINDER_LIMITS:
+                data.enforceBinnerLimits ?? prev.ENFORCE_BINDER_LIMITS,
+              ENFORCE_CARD_LIMITS:
+                data.enforceCardLimits ?? prev.ENFORCE_CARD_LIMITS,
+              ENFORCE_STORAGE_WARNINGS:
+                data.enforceStorageWarnings ?? prev.ENFORCE_STORAGE_WARNINGS,
+              ENFORCE_FEATURE_LOCKS:
+                data.enforceFeatureLocks ?? prev.ENFORCE_FEATURE_LOCKS,
+              STRICT_MODE: data.strictMode ?? prev.STRICT_MODE,
+            }));
+          }
+
+          // Load warning thresholds
+          if (data.warningThresholds) {
+            setWarningThresholds((prev) => ({
+              ...prev,
+              ...data.warningThresholds,
+            }));
+          }
+
+          // Load save rate limits
+          setSaveRateLimits((prev) => ({
+            guestSavesPerMinute:
+              data.guestSavesPerMinute ?? prev.guestSavesPerMinute,
+            guestSavesPerHour: data.guestSavesPerHour ?? prev.guestSavesPerHour,
+            registeredSavesPerMinute:
+              data.registeredSavesPerMinute ?? prev.registeredSavesPerMinute,
+            registeredSavesPerHour:
+              data.registeredSavesPerHour ?? prev.registeredSavesPerHour,
+            saveCooldownSeconds:
+              data.saveCooldownSeconds ?? prev.saveCooldownSeconds,
+            enforceSaveRateLimits:
+              data.enforceSaveRateLimits ?? prev.enforceSaveRateLimits,
+          }));
+
+          // Set last saved time if available
+          if (data.lastUpdated) {
+            setLastSaved(new Date(data.lastUpdated.seconds * 1000));
+          }
         }
       } catch (error) {
         console.error("Error loading configuration:", error);
       }
     };
 
-    loadConfiguration();
-  }, []);
+    if (isOwner) {
+      loadConfiguration();
+    }
+  }, [isOwner]);
 
   // Save configuration
   const saveConfiguration = async () => {
@@ -214,16 +280,47 @@ const SystemConfiguration = () => {
       await setDoc(
         configRef,
         {
+          // Guest user limits
+          guestMaxBinders: userLimits.guest.maxBinders,
+          guestMaxCardsPerBinder: userLimits.guest.maxCardsPerBinder,
           guestMaxPages: userLimits.guest.maxPages,
+
+          // Registered user limits
+          registeredMaxBinders: userLimits.registered.maxBinders,
+          registeredMaxCardsPerBinder: userLimits.registered.maxCardsPerBinder,
           registeredMaxPages: userLimits.registered.maxPages,
+
+          // Enforcement flags
+          enforceBinnerLimits: limitConfig.ENFORCE_BINDER_LIMITS,
+          enforceCardLimits: limitConfig.ENFORCE_CARD_LIMITS,
+          enforceStorageWarnings: limitConfig.ENFORCE_STORAGE_WARNINGS,
+          enforceFeatureLocks: limitConfig.ENFORCE_FEATURE_LOCKS,
+          strictMode: limitConfig.STRICT_MODE,
+
+          // Warning thresholds
+          warningThresholds: warningThresholds,
+
+          // Save rate limits
+          guestSavesPerMinute: saveRateLimits.guestSavesPerMinute,
+          guestSavesPerHour: saveRateLimits.guestSavesPerHour,
+          registeredSavesPerMinute: saveRateLimits.registeredSavesPerMinute,
+          registeredSavesPerHour: saveRateLimits.registeredSavesPerHour,
+          saveCooldownSeconds: saveRateLimits.saveCooldownSeconds,
+          enforceSaveRateLimits: saveRateLimits.enforceSaveRateLimits,
+
+          // Metadata
+          lastUpdated: new Date(),
+          updatedBy: currentUser.uid,
         },
         { merge: true }
       );
 
       setHasUnsavedChanges(false);
       setLastSaved(new Date());
+      console.log("System configuration saved successfully");
     } catch (error) {
       console.error("Failed to save configuration:", error);
+      alert("Failed to save configuration. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -281,15 +378,6 @@ const SystemConfiguration = () => {
               </div>
             )}
 
-            {hasUnsavedChanges && (
-              <Badge
-                variant="outline"
-                className="text-amber-600 border-amber-600"
-              >
-                Unsaved changes
-              </Badge>
-            )}
-
             <Button
               onClick={resetToDefaults}
               variant="outline"
@@ -300,19 +388,19 @@ const SystemConfiguration = () => {
               Reset
             </Button>
 
-            <Button
-              onClick={saveConfiguration}
-              disabled={!hasUnsavedChanges || isSaving}
-              className="bg-green-600 hover:bg-green-700"
-              size="sm"
-            >
-              {isSaving ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              Save Changes
-            </Button>
+            <TooltipProvider>
+              <SaveButton
+                onClick={saveConfiguration}
+                disabled={!hasUnsavedChanges}
+                loading={isSaving}
+                variant="default"
+                size="sm"
+                className="bg-green-600 hover:bg-green-700"
+                showStats={true}
+              >
+                Save Changes
+              </SaveButton>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -328,10 +416,14 @@ const SystemConfiguration = () => {
 
         {/* Configuration Tabs */}
         <Tabs defaultValue="limits" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="limits" className="flex items-center">
               <Users className="h-4 w-4 mr-2" />
               User Limits
+            </TabsTrigger>
+            <TabsTrigger value="ratelimits" className="flex items-center">
+              <Clock className="h-4 w-4 mr-2" />
+              Rate Limits
             </TabsTrigger>
             <TabsTrigger value="features" className="flex items-center">
               <Zap className="h-4 w-4 mr-2" />
@@ -670,6 +762,243 @@ const SystemConfiguration = () => {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Rate Limits Tab */}
+          <TabsContent value="ratelimits" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="h-5 w-5 mr-2" />
+                  Save Operation Rate Limiting
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Rate Limiting Toggle */}
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center mb-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mr-2" />
+                        <span className="font-medium text-yellow-900 dark:text-yellow-100">
+                          Enforce Save Rate Limits
+                        </span>
+                      </div>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                        Enable rate limiting for save operations (binder
+                        updates, preferences, etc.)
+                      </p>
+                    </div>
+                    <Switch
+                      checked={saveRateLimits.enforceSaveRateLimits}
+                      onCheckedChange={(checked) => {
+                        setSaveRateLimits((prev) => ({
+                          ...prev,
+                          enforceSaveRateLimits: checked,
+                        }));
+                        markChanges();
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Rate Limit Configuration */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Guest User Limits */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-orange-600 dark:text-orange-400 flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        Guest Users
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>
+                          Saves per minute: {saveRateLimits.guestSavesPerMinute}
+                        </Label>
+                        <Slider
+                          value={[saveRateLimits.guestSavesPerMinute]}
+                          onValueChange={([value]) => {
+                            setSaveRateLimits((prev) => ({
+                              ...prev,
+                              guestSavesPerMinute: value,
+                            }));
+                            markChanges();
+                          }}
+                          max={20}
+                          min={1}
+                          step={1}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-500">
+                          Maximum save operations per minute for guest users
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>
+                          Saves per hour: {saveRateLimits.guestSavesPerHour}
+                        </Label>
+                        <Slider
+                          value={[saveRateLimits.guestSavesPerHour]}
+                          onValueChange={([value]) => {
+                            setSaveRateLimits((prev) => ({
+                              ...prev,
+                              guestSavesPerHour: value,
+                            }));
+                            markChanges();
+                          }}
+                          max={100}
+                          min={5}
+                          step={5}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-500">
+                          Maximum save operations per hour for guest users
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Registered User Limits */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-green-600 dark:text-green-400 flex items-center">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Registered Users
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>
+                          Saves per minute:{" "}
+                          {saveRateLimits.registeredSavesPerMinute}
+                        </Label>
+                        <Slider
+                          value={[saveRateLimits.registeredSavesPerMinute]}
+                          onValueChange={([value]) => {
+                            setSaveRateLimits((prev) => ({
+                              ...prev,
+                              registeredSavesPerMinute: value,
+                            }));
+                            markChanges();
+                          }}
+                          max={50}
+                          min={5}
+                          step={1}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-500">
+                          Maximum save operations per minute for registered
+                          users
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>
+                          Saves per hour:{" "}
+                          {saveRateLimits.registeredSavesPerHour}
+                        </Label>
+                        <Slider
+                          value={[saveRateLimits.registeredSavesPerHour]}
+                          onValueChange={([value]) => {
+                            setSaveRateLimits((prev) => ({
+                              ...prev,
+                              registeredSavesPerHour: value,
+                            }));
+                            markChanges();
+                          }}
+                          max={500}
+                          min={20}
+                          step={10}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-500">
+                          Maximum save operations per hour for registered users
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Global Settings */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Settings className="h-5 w-5 mr-2" />
+                      Global Save Settings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>
+                        Cooldown between saves:{" "}
+                        {saveRateLimits.saveCooldownSeconds} seconds
+                      </Label>
+                      <Slider
+                        value={[saveRateLimits.saveCooldownSeconds]}
+                        onValueChange={([value]) => {
+                          setSaveRateLimits((prev) => ({
+                            ...prev,
+                            saveCooldownSeconds: value,
+                          }));
+                          markChanges();
+                        }}
+                        max={10}
+                        min={0}
+                        step={0.5}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Minimum time required between consecutive save
+                        operations
+                      </p>
+                    </div>
+
+                    {/* Rate Limit Preview */}
+                    <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <h4 className="font-medium mb-3">
+                        Current Rate Limit Summary
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">
+                            Guest Users:
+                          </p>
+                          <p className="font-medium">
+                            {saveRateLimits.guestSavesPerMinute}/min,{" "}
+                            {saveRateLimits.guestSavesPerHour}/hour
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 dark:text-gray-400">
+                            Registered Users:
+                          </p>
+                          <p className="font-medium">
+                            {saveRateLimits.registeredSavesPerMinute}/min,{" "}
+                            {saveRateLimits.registeredSavesPerHour}/hour
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-gray-600 dark:text-gray-400">
+                          Global Cooldown:
+                        </p>
+                        <p className="font-medium">
+                          {saveRateLimits.saveCooldownSeconds} seconds
+                        </p>
+                      </div>
+                      <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                        {saveRateLimits.enforceSaveRateLimits
+                          ? "✓ Rate limiting is ENABLED - limits will be enforced"
+                          : "⚠ Rate limiting is DISABLED - no limits enforced"}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
           </TabsContent>

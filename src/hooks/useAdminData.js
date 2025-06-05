@@ -14,15 +14,16 @@ import {
   deleteUserAccount,
 } from "../services/firestore";
 
-// ===== ADMIN STATS WITH CACHING =====
+// ===== SIMPLIFIED ADMIN STATS (OWNER ONLY) =====
 
 export const useAdminStats = () => {
   return useQuery({
     queryKey: ["adminStats"],
     queryFn: getAdminStats,
-    staleTime: 1000 * 60 * 5, // 5 minutes - admin stats don't change frequently
-    gcTime: 1000 * 60 * 30, // 30 minutes cache
-    refetchInterval: 1000 * 60 * 10, // Auto-refresh every 10 minutes
+    // Simplified for owner-only use
+    staleTime: 1000 * 30, // Only 30 seconds - owner wants fresh data
+    gcTime: 1000 * 60 * 5, // 5 minutes cache
+    // No auto-refresh interval - owner can manually refresh when needed
   });
 };
 
@@ -147,7 +148,7 @@ export const useBulkUserOperations = () => {
   return { bulkDelete };
 };
 
-// ===== SYSTEM HEALTH MONITORING =====
+// ===== SIMPLIFIED SYSTEM HEALTH (OWNER ONLY) =====
 
 export const useSystemHealth = () => {
   const { data: adminStats, isLoading, error } = useAdminStats();

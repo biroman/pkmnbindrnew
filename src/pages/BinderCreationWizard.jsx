@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,10 +14,16 @@ import {
   Trophy,
   Sparkles,
   Crown,
+  AlertTriangle,
 } from "lucide-react";
-import { Button, Slider } from "../components/ui";
+import { Button, Slider, Alert, AlertDescription } from "../components/ui";
 import { useAnimations } from "../contexts/AnimationContext";
 import { usePageLimits } from "../hooks/usePageLimits";
+import { useAuth } from "../contexts/AuthContext";
+import { useUserLimits } from "../hooks/useUserLimits";
+import { useAddBinder } from "../hooks/useUserData";
+import { useQuery } from "@tanstack/react-query";
+import { getBindersForUser } from "../services/firestore";
 
 const WIZARD_STEPS = [
   {
@@ -208,20 +214,61 @@ const BinderCreationWizard = () => {
   const navigate = useNavigate();
   const { getTransition, shouldAnimate } = useAnimations();
   const { maxPages } = usePageLimits();
+  const { currentUser } = useAuth();
+  const { canCreateBinder, limits } = useUserLimits();
+  const addBinderMutation = useAddBinder();
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Fetch current binder count to check limits
+  const { data: bindersData } = useQuery({
+    queryKey: ["userBinders", currentUser?.uid],
+    queryFn: () => {
+      if (!currentUser?.uid) {
+        return Promise.resolve({ success: false, binders: [] });
+      }
+      return getBindersForUser(currentUser.uid);
+    },
+    enabled: !!currentUser?.uid,
+  });
+
+  const currentBinderCount = bindersData?.binders?.length || 0;
+  const canCreate = canCreateBinder(currentBinderCount);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [wizardData, setWizardData] = useState({
-    template: null,
-    name: "",
+    templateId: "scratch",
+    binderName: "",
     description: "",
     gridSize: "3x3",
-    pageCount: Math.min(10, maxPages),
-    backgroundColor: "blue",
+    pageCount: Math.min(10, maxPages || 10),
   });
 
   const currentStepId = WIZARD_STEPS[currentStep].id;
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === WIZARD_STEPS.length - 1;
+
+  // Check limits on mount and redirect if necessary
+  useEffect(() => {
+    if (
+      currentUser &&
+      !canCreate &&
+      limits.maxBinders !== Number.MAX_SAFE_INTEGER
+    ) {
+      console.warn("User has reached the maximum number of binders allowed.");
+      navigate("/app/collections", {
+        replace: true,
+        state: {
+          message: `You have reached your binder limit (${currentBinderCount}/${
+            limits.maxBinders
+          }). ${
+            currentUser
+              ? "Consider organizing your existing binders."
+              : "Sign up for more binders!"
+          }`,
+        },
+      });
+    }
+  }, [currentUser, canCreate, limits.maxBinders, currentBinderCount, navigate]);
 
   const handleNext = () => {
     if (!isLastStep) {
@@ -237,22 +284,74 @@ const BinderCreationWizard = () => {
     }
   };
 
-  const handleCreateBinder = () => {
-    // Mock creation - navigate to new binder
-    console.log("Creating binder with data:", wizardData);
-    navigate("/app/binder/new-12345");
+  const handleCreateBinder = async () => {
+    if (!currentUser?.uid) {
+      console.error("User not authenticated. Cannot create binder.");
+      return;
+    }
+
+    // Double-check limits before creating
+    if (!canCreate) {
+      alert(
+        `You have reached your binder limit (${currentBinderCount}/${limits.maxBinders}). Cannot create more binders.`
+      );
+      navigate("/app/collections");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const binderToCreate = {
+        binderName:
+          wizardData.binderName ||
+          `${wizardData.templateId} Binder` ||
+          "Untitled Binder",
+        description: wizardData.description || "",
+        gridSize: wizardData.gridSize,
+        pageCount: wizardData.pageCount,
+      };
+
+      console.log("Attempting to create binder with data:", binderToCreate);
+
+      const result = await addBinderMutation.mutateAsync({
+        userId: currentUser.uid,
+        binderData: binderToCreate,
+      });
+
+      if (result.success && result.binderId) {
+        console.log("Binder created successfully with ID:", result.binderId);
+        navigate(`/app/binder/${result.binderId}`);
+      } else {
+        console.error("Failed to create binder in Firestore:", result.error);
+        alert(`Error creating binder: ${result.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Exception during handleCreateBinder:", error);
+      alert(`An unexpected error occurred: ${error.message}`);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const updateWizardData = (updates) => {
     setWizardData((prev) => ({ ...prev, ...updates }));
   };
 
+  const handleTemplateSelect = (template) => {
+    updateWizardData({
+      templateId: template.id,
+      binderName: wizardData.binderName || template.name,
+      gridSize: template.gridSize,
+      pageCount: Math.min(template.pageCount, maxPages || template.pageCount),
+    });
+  };
+
   const canProceed = () => {
     switch (currentStepId) {
       case "template":
-        return wizardData.template !== null;
+        return wizardData.templateId !== null;
       case "basics":
-        return wizardData.name.trim().length > 0;
+        return wizardData.binderName.trim().length > 0;
       case "layout":
         return wizardData.gridSize && wizardData.pageCount > 0;
       case "preview":
@@ -262,19 +361,16 @@ const BinderCreationWizard = () => {
     }
   };
 
+  // Show limit warning if approaching limit
+  const showLimitWarning =
+    currentBinderCount >= limits.maxBinders * 0.8 &&
+    limits.maxBinders !== Number.MAX_SAFE_INTEGER;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => navigate("/app/binder")}
-            className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Binders
-          </button>
-
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Create New Binder
           </h1>
@@ -282,6 +378,20 @@ const BinderCreationWizard = () => {
             Set up your Pokemon card binder in just a few steps
           </p>
         </div>
+
+        {/* Limit Warning */}
+        {showLimitWarning && (
+          <Alert className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-900/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              <strong>Approaching limit:</strong> You have {currentBinderCount}{" "}
+              of {limits.maxBinders} binders.
+              {currentUser
+                ? " Consider organizing your existing binders."
+                : " Sign up for more binders!"}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Progress Bar */}
         <ProgressBar steps={WIZARD_STEPS} currentStep={currentStep} />
@@ -298,14 +408,10 @@ const BinderCreationWizard = () => {
             >
               {currentStepId === "template" && (
                 <TemplateStep
-                  selected={wizardData.template}
-                  onSelect={(template) =>
-                    updateWizardData({
-                      template,
-                      gridSize: template.gridSize,
-                      pageCount: template.pageCount,
-                    })
-                  }
+                  selected={BINDER_TEMPLATES.find(
+                    (t) => t.id === wizardData.templateId
+                  )}
+                  onSelect={handleTemplateSelect}
                 />
               )}
 
@@ -336,12 +442,16 @@ const BinderCreationWizard = () => {
 
           <Button
             onClick={handleNext}
-            disabled={!canProceed()}
+            disabled={!canProceed() || isCreating}
             className="bg-blue-600 hover:bg-blue-700 text-white flex items-center"
           >
-            {isLastStep ? "Create Binder" : "Continue"}
+            {isLastStep
+              ? isCreating
+                ? "Creating..."
+                : "Create Binder"
+              : "Continue"}
             {!isLastStep && <ArrowRight className="w-4 h-4 ml-2" />}
-            {isLastStep && <Sparkles className="w-4 h-4 ml-2" />}
+            {isLastStep && !isCreating && <Sparkles className="w-4 h-4 ml-2" />}
           </Button>
         </div>
       </div>
@@ -505,9 +615,10 @@ const BasicsStep = ({ data, onChange }) => {
           </label>
           <input
             type="text"
-            value={data.name}
-            onChange={(e) => onChange({ name: e.target.value })}
+            value={data.binderName}
+            onChange={(e) => onChange({ binderName: e.target.value })}
             placeholder="e.g., My Base Set Collection"
+            maxLength={100}
             className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           />
         </div>
@@ -521,6 +632,7 @@ const BasicsStep = ({ data, onChange }) => {
             onChange={(e) => onChange({ description: e.target.value })}
             placeholder="Describe what you'll store in this binder..."
             rows={3}
+            maxLength={500}
             className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
           />
         </div>
@@ -628,7 +740,7 @@ const PreviewStep = ({ data }) => {
             </div>
             <div>
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {data.name || "Untitled Binder"}
+                {data.binderName || "Untitled Binder"}
               </h3>
               {data.description && (
                 <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -644,7 +756,7 @@ const PreviewStep = ({ data }) => {
                 Template
               </div>
               <div className="font-semibold text-gray-900 dark:text-white">
-                {data.template?.name || "Custom"}
+                {data.templateId}
               </div>
             </div>
             <div>

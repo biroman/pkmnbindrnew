@@ -1,8 +1,21 @@
 import { useState, useRef, useEffect } from "react";
 import BinderGrid from "./BinderGrid";
 import { parseGridSize } from "../../utils/gridUtils";
-import { ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
-import { Button } from "../ui";
+import {
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  Plus,
+  Trash2,
+  Lock,
+} from "lucide-react";
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui";
 
 /**
  * BinderSpread - Two-page spread component that mimics a real binder
@@ -11,13 +24,40 @@ import { Button } from "../ui";
  * @param {Object} gridDimensions - Grid dimensions from useGridDimensions
  * @param {string} gridSize - Grid size string like "3x3", "4x3", etc.
  * @param {number} currentPage - Current page being viewed
+ * @param {number} totalPages - Total number of pages in binder
  * @param {Function} onAddCard - Callback when a card slot is clicked
+ * @param {Function} onPreviousPage - Callback for previous page navigation
+ * @param {Function} onNextPage - Callback for next page navigation
+ * @param {Function} onAddPage - Callback for adding a new page
+ * @param {Function} onDeletePage - Callback for deleting current page
+ * @param {boolean} canGoPrevious - Whether previous navigation is available
+ * @param {boolean} canGoNext - Whether next navigation is available
+ * @param {boolean} isAtPageLimit - Whether the user is at their page limit
+ * @param {string} limitReason - Reason why page limit exists (for tooltip)
+ * @param {number} maxPages - Maximum pages allowed
+ * @param {Array} cardsOnPage1 - Cards for the first/left page
+ * @param {Array} cardsOnPage2 - Cards for the second/right page
  */
 const BinderSpread = ({
   gridDimensions,
   gridSize = "3x3",
   currentPage = 1,
+  totalPages = 10,
   onAddCard,
+  onPreviousPage,
+  onNextPage,
+  onAddPage,
+  onDeletePage,
+  canGoPrevious = false,
+  canGoNext = false,
+  isAtPageLimit = false,
+  limitReason = "",
+  maxPages = null,
+  cardsOnPage1 = [],
+  cardsOnPage2 = [],
+  allCards = [], // All cards for drag validation
+  onCardMove, // Callback for card moves
+  isDragEnabled = true, // Whether drag and drop is enabled
   ...props
 }) => {
   const { totalSlots } = parseGridSize(gridSize);
@@ -26,6 +66,12 @@ const BinderSpread = ({
 
   // Mobile page state (which page to show: "left" or "right")
   const [mobilePage, setMobilePage] = useState("right"); // Default to right for page 1
+
+  // Hold-to-delete state
+  const [isHolding, setIsHolding] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdTimerRef = useRef(null);
+  const progressIntervalRef = useRef(null);
 
   // Calculate the actual page height for binding
   useEffect(() => {
@@ -41,6 +87,58 @@ const BinderSpread = ({
       setMobilePage("right");
     }
   }, [currentPage, gridDimensions.isMobile]);
+
+  // Cleanup hold timers on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Hold-to-delete functions
+  const startHoldToDelete = () => {
+    console.log("Starting hold to delete for page:", currentPage);
+    setIsHolding(true);
+    setHoldProgress(0);
+
+    // Progress animation (update every 50ms for smooth animation)
+    progressIntervalRef.current = setInterval(() => {
+      setHoldProgress((prev) => {
+        const newProgress = prev + (50 / 1000) * 100; // 50ms steps over 1000ms = 5% per step
+        return Math.min(newProgress, 100);
+      });
+    }, 50);
+
+    // Delete after 1 second
+    holdTimerRef.current = setTimeout(() => {
+      console.log("Hold complete, deleting page:", currentPage);
+      if (onDeletePage) {
+        onDeletePage(currentPage);
+      }
+      cancelHoldToDelete();
+    }, 1000);
+  };
+
+  const cancelHoldToDelete = () => {
+    console.log("Canceling hold to delete");
+    setIsHolding(false);
+    setHoldProgress(0);
+
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  };
 
   // Calculate page layout based on page structure
   const getPageLayout = (page) => {
@@ -160,6 +258,7 @@ const BinderSpread = ({
                 startingSlot={currentSide.startingSlot}
                 onAddCard={onAddCard}
                 pageType={mobilePage}
+                savedCards={mobilePage === "left" ? cardsOnPage1 : cardsOnPage2}
                 {...props}
               />
             )}
@@ -174,9 +273,151 @@ const BinderSpread = ({
     <div className="flex-1 h-full overflow-hidden">
       <div className="h-full flex items-center justify-center p-4">
         <div
-          className="flex items-center"
+          className="relative flex items-center"
           style={{ width: `${gridDimensions.totalWidth}px` }}
         >
+          {/* Page Navigation - Left */}
+          {onPreviousPage && (
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={onPreviousPage}
+              disabled={!canGoPrevious}
+              className="absolute -left-16 top-1/2 transform -translate-y-1/2 h-12 w-12 p-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-full shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:scale-110 disabled:hover:scale-100 transition-all duration-200 disabled:opacity-50 z-10"
+              title="Previous Page"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+          )}
+
+          {/* Page Navigation - Right */}
+          {(onNextPage || onAddPage) && (
+            <div className="absolute -right-16 top-1/2 transform -translate-y-1/2 z-50">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={currentPage >= totalPages ? "default" : "ghost"}
+                      size="lg"
+                      onClick={
+                        currentPage >= totalPages ? onAddPage : onNextPage
+                      }
+                      disabled={
+                        currentPage >= totalPages ? isAtPageLimit : !canGoNext
+                      }
+                      className={`h-12 w-12 p-0 backdrop-blur-xl rounded-full shadow-lg border transition-all duration-200 ${
+                        currentPage >= totalPages
+                          ? isAtPageLimit
+                            ? "!bg-gray-400 !text-gray-600 !border-gray-300 cursor-not-allowed" // Disabled state
+                            : "!bg-blue-500 hover:!bg-blue-600 dark:!bg-blue-500 dark:hover:!bg-blue-600 !text-white !border-blue-400 dark:!border-blue-400 hover:scale-110" // Active state
+                          : !canGoNext
+                          ? "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 disabled:opacity-50 disabled:hover:scale-100"
+                          : "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 hover:scale-110"
+                      }`}
+                      title={
+                        currentPage >= totalPages
+                          ? isAtPageLimit
+                            ? `Page limit reached (${totalPages}/${maxPages})`
+                            : "Add New Page"
+                          : "Next Page"
+                      }
+                    >
+                      {currentPage >= totalPages ? (
+                        isAtPageLimit ? (
+                          <Lock className="h-6 w-6" />
+                        ) : (
+                          <Plus className="h-6 w-6" />
+                        )
+                      ) : (
+                        <ChevronRight className="h-6 w-6" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  {currentPage >= totalPages && isAtPageLimit && (
+                    <TooltipContent
+                      side="left"
+                      sideOffset={8}
+                      className="max-w-xs p-3 bg-gray-900 text-white border border-gray-700 shadow-xl z-[9999]"
+                    >
+                      <div className="space-y-2">
+                        <p className="font-medium text-sm">
+                          Page limit reached
+                        </p>
+                        <p className="text-xs text-gray-300 leading-relaxed">
+                          {limitReason ||
+                            "You've reached the maximum number of pages for this binder."}
+                        </p>
+                        {maxPages && (
+                          <div className="flex items-center justify-between pt-1 mt-2 border-t border-gray-700">
+                            <span className="text-xs text-gray-400">
+                              Pages:
+                            </span>
+                            <span className="text-xs text-blue-300 font-medium">
+                              {totalPages}/{maxPages}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+
+          {/* Delete Page Button */}
+          {onDeletePage && totalPages > 1 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onMouseDown={startHoldToDelete}
+              onMouseUp={cancelHoldToDelete}
+              onMouseLeave={cancelHoldToDelete}
+              onTouchStart={startHoldToDelete}
+              onTouchEnd={cancelHoldToDelete}
+              className={`absolute -right-14 top-1/2 mt-8 h-8 w-8 p-0 backdrop-blur-xl rounded-full shadow-md border transition-all duration-200 hover:scale-110 z-10 ${
+                isHolding
+                  ? "bg-red-500 hover:bg-red-600 text-white border-red-400"
+                  : "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:border-red-200 dark:hover:border-red-800"
+              }`}
+              title={`Hold to Delete Page ${currentPage}`}
+            >
+              {/* Progress Ring */}
+              {isHolding && (
+                <div className="absolute inset-0 rounded-full">
+                  <svg
+                    className="w-full h-full transform -rotate-90"
+                    viewBox="0 0 32 32"
+                  >
+                    <circle
+                      cx="16"
+                      cy="16"
+                      r="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeOpacity="0.3"
+                    />
+                    <circle
+                      cx="16"
+                      cy="16"
+                      r="14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeDasharray={`${2 * Math.PI * 14}`}
+                      strokeDashoffset={`${
+                        2 * Math.PI * 14 * (1 - holdProgress / 100)
+                      }`}
+                      className="transition-all duration-75 ease-linear"
+                    />
+                  </svg>
+                </div>
+              )}
+              <Trash2 className="h-4 w-4 relative z-10" />
+            </Button>
+          )}
+
           {/* Left Side */}
           <div
             ref={leftPageRef}
@@ -192,6 +433,10 @@ const BinderSpread = ({
                 startingSlot={pageLayout.leftSide.startingSlot}
                 onAddCard={onAddCard}
                 pageType="left"
+                savedCards={cardsOnPage1}
+                allCards={allCards}
+                onCardMove={onCardMove}
+                isDragEnabled={isDragEnabled}
                 {...props}
               />
             )}
@@ -233,6 +478,10 @@ const BinderSpread = ({
                 startingSlot={pageLayout.rightSide.startingSlot}
                 onAddCard={onAddCard}
                 pageType="right"
+                savedCards={currentPage === 1 ? cardsOnPage1 : cardsOnPage2}
+                allCards={allCards}
+                onCardMove={onCardMove}
+                isDragEnabled={isDragEnabled}
                 {...props}
               />
             )}

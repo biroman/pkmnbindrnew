@@ -163,6 +163,13 @@ export const LIMIT_MESSAGES = {
       "This binder has reached the 400 card limit. Consider creating a new binder for additional cards.",
   },
 
+  PAGE_LIMIT_REACHED: {
+    guest:
+      "You've reached the page limit for guest users. Sign up for higher page limits and cloud storage!",
+    registered:
+      "You've reached the maximum pages allowed per binder. To ensure optimal performance and manage server costs, we limit pages per binder.",
+  },
+
   FEATURE_LOCKED: {
     sharing:
       "Sharing is available for registered users. Sign up to share your binders with friends!",

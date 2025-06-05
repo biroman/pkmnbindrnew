@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Activity,
   Cog,
+  DollarSign,
 } from "lucide-react";
 import {
   Card,
@@ -30,6 +31,7 @@ import {
 import AdminDashboard from "../AdminDashboard";
 import UserManagement from "../UserManagement";
 import SystemConfiguration from "../SystemConfiguration";
+import { CostMonitoringDashboard } from "../CostMonitoringDashboard";
 
 const AdminSection = ({ currentUser, userProfile, isOwner }) => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -40,6 +42,12 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
       name: "System Overview",
       icon: BarChart3,
       description: "View system statistics and health metrics",
+    },
+    {
+      id: "cost-monitoring",
+      name: "Cost Monitoring",
+      icon: DollarSign,
+      description: "Monitor Firebase usage and costs",
     },
     {
       id: "users",
@@ -141,7 +149,7 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
         </div>
 
         {/* Enhanced Tab Navigation */}
-        <nav className="flex space-x-2 mb-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+        <nav className="flex space-x-2 mb-6 p-1 bg-gray-100 items-center justify-center dark:bg-gray-700 rounded-lg">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -149,7 +157,7 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    className={`flex items-center px-4 py-2 rounded-md text-xs font-medium transition-all ${
                       activeTab === tab.id
                         ? "bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 shadow-sm border border-purple-200 dark:border-purple-800"
                         : "text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-white/50 dark:hover:bg-gray-800/50"
@@ -177,6 +185,8 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
               showOnlyContent={true}
             />
           )}
+
+          {activeTab === "cost-monitoring" && <CostMonitoringDashboard />}
 
           {activeTab === "users" && <UserManagement />}
 

@@ -11,10 +11,12 @@ import {
   Database,
   AlertTriangle,
   BookOpen,
+  Shield,
 } from "lucide-react";
 import Button from "../ui/Button";
 import RoleGuard from "../ui/RoleGuard";
 import UserManagement from "./UserManagement";
+import { CostMonitoringDashboard } from "./CostMonitoringDashboard";
 import { getAdminStats, migrateUserRoles } from "../../services/firestore";
 
 const AdminDashboard = ({
@@ -28,6 +30,7 @@ const AdminDashboard = ({
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Load admin stats if user is owner
   useEffect(() => {

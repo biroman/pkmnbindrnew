@@ -21,7 +21,7 @@ const UnderDevelopment = () => {
 
   const formatTime = (date) => {
     return date.toLocaleTimeString("en-US", {
-      hour12: false,
+      hour12: true,
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
@@ -51,7 +51,7 @@ const UnderDevelopment = () => {
 
         {/* Main Content */}
         <div className="space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white whitespace-nowrap">
             We're Building Something
             <span className="block text-blue-600 dark:text-blue-400">
               Amazing
@@ -66,35 +66,35 @@ const UnderDevelopment = () => {
 
         {/* Status Cards */}
         <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
-            <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-3" />
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg min-h-[140px] flex flex-col justify-center">
+            <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-3 flex-shrink-0" />
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2 whitespace-nowrap">
               Current Time
             </h3>
-            <p className="text-2xl font-mono text-blue-600 dark:text-blue-400">
+            <p className="text-xl font-mono text-blue-600 dark:text-blue-400 whitespace-nowrap min-w-[120px]">
               {formatTime(currentTime)}
             </p>
           </div>
 
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
-            <Cloud className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-3" />
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg min-h-[140px] flex flex-col justify-center">
+            <Cloud className="h-8 w-8 text-blue-600 dark:text-blue-400 mx-auto mb-3 flex-shrink-0" />
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2 whitespace-nowrap">
               Security
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-tight">
               Adding possibility to store your collection in the cloud.
             </p>
           </div>
 
-          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
-            <Heart className="h-8 w-8 text-red-500 dark:text-red-400 mx-auto mb-3" />
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+          <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg min-h-[140px] flex flex-col justify-center">
+            <Heart className="h-8 w-8 text-red-500 dark:text-red-400 mx-auto mb-3 flex-shrink-0" />
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2 whitespace-nowrap">
               Progress
             </h3>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
               <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full w-3/5 animate-pulse"></div>
             </div>
-            <p className="text-xs text-gray-600 dark:text-gray-300">
+            <p className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
               60% Complete
             </p>
           </div>
@@ -109,29 +109,41 @@ const UnderDevelopment = () => {
             <div className="space-y-3">
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Better user experience</span>
+                <span className="whitespace-nowrap">
+                  Better user experience
+                </span>
               </div>
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Real-time Card Value Tracking</span>
+                <span className="whitespace-nowrap">
+                  Real-time Card Value Tracking
+                </span>
               </div>
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Collection Statistics & Analytics</span>
+                <span className="whitespace-nowrap">
+                  Collection Statistics & Analytics
+                </span>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Share your collection with friends</span>
+                <span className="whitespace-nowrap">
+                  Share your collection with friends
+                </span>
               </div>
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Secure User Authentication</span>
+                <span className="whitespace-nowrap">
+                  Secure User Authentication
+                </span>
               </div>
               <div className="flex items-center text-gray-700 dark:text-gray-300">
                 <ArrowRight className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0" />
-                <span>Modern, Responsive Design</span>
+                <span className="whitespace-nowrap">
+                  Modern, Responsive Design
+                </span>
               </div>
             </div>
           </div>
@@ -139,10 +151,10 @@ const UnderDevelopment = () => {
 
         {/* Footer */}
         <div className="pt-8 border-t border-gray-200/30 dark:border-gray-700/30">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
             © 2025 Pokemon Binder. Currently in development.
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 whitespace-nowrap">
             Status: Development Mode • Last updated:{" "}
             {currentTime.toLocaleDateString()}
           </p>
@@ -159,7 +171,7 @@ const UnderDevelopment = () => {
       </div>
 
       {/* Custom styles */}
-      <style jsx>{`
+      <style>{`
         @keyframes shimmer {
           0% {
             transform: translateX(-100%);

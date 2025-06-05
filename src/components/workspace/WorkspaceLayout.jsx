@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "../ui";
 import VerticalToolbar from "./VerticalToolbar";
 import Sidebar from "./Sidebar";
 import { useAnimations } from "../../contexts/AnimationContext";
+import { EditHistoryPanel } from "../../components/history";
 
 /**
  * WorkspaceLayout - Main layout container following design tool patterns
@@ -18,6 +19,7 @@ const WorkspaceLayout = ({
   onUndo,
   onRedo,
   onAddCards,
+  onClipboard,
   onPreviousPage,
   onNextPage,
   canUndo = false,
@@ -29,18 +31,35 @@ const WorkspaceLayout = ({
   onGridSizeChange,
   showReverseHolos = true,
   onToggleReverseHolos,
+  hideMissingCards = false,
+  onToggleHideMissingCards,
+  missingCards = [],
+  onAddMissingCard,
+  onRemoveMissingCard,
   pageCount = 10,
   onPageCountChange,
   currentPage = 1,
+  binderName,
+  isEditingName,
+  tempName,
+  onStartNameEdit,
+  onSaveNameEdit,
+  onCancelNameEdit,
+  onNameChange,
+  onNameKeyPress,
   isDirty = false,
   onSave,
   onRevert,
   isSaving = false,
   binderInfo,
   clipboard,
+  onToggleOverviewMode,
+  isOverviewModeActive,
   disabled = false,
+  binderId,
 }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const { getVariants, getTransition, shouldAnimate } = useAnimations();
 
   // Animation variants for toolbar (using opacity + scale since it's fixed positioned)
@@ -67,12 +86,16 @@ const WorkspaceLayout = ({
           onUndo={onUndo}
           onRedo={onRedo}
           onAddCards={onAddCards}
+          onClipboard={onClipboard}
           onPreviousPage={onPreviousPage}
           onNextPage={onNextPage}
           canUndo={canUndo}
           canRedo={canRedo}
           canGoPrevious={canGoPrevious}
           canGoNext={canGoNext}
+          onToggleHistoryPanel={() => setIsHistoryPanelOpen((prev) => !prev)}
+          onToggleOverviewMode={onToggleOverviewMode}
+          isOverviewModeActive={isOverviewModeActive}
           disabled={disabled}
         />
       </motion.div>
@@ -80,7 +103,7 @@ const WorkspaceLayout = ({
       {/* Main Content Area */}
       <motion.div
         layout={shouldAnimate()}
-        className="h-full ml-20"
+        className="h-full ml-20 relative"
         animate={{
           marginRight: sidebarCollapsed ? 0 : 320, // 320px = w-80
         }}
@@ -89,7 +112,7 @@ const WorkspaceLayout = ({
           ease: [0.25, 0.1, 0.25, 1], // Custom easing for smooth feel
         })}
       >
-        <div className="h-full p-6">{children}</div>
+        <div className="h-full">{children}</div>
       </motion.div>
 
       {/* Right Sidebar */}
@@ -99,9 +122,22 @@ const WorkspaceLayout = ({
           onGridSizeChange={onGridSizeChange}
           showReverseHolos={showReverseHolos}
           onToggleReverseHolos={onToggleReverseHolos}
+          hideMissingCards={hideMissingCards}
+          onToggleHideMissingCards={onToggleHideMissingCards}
+          missingCards={missingCards}
+          onAddMissingCard={onAddMissingCard}
+          onRemoveMissingCard={onRemoveMissingCard}
           pageCount={pageCount}
           onPageCountChange={onPageCountChange}
           currentPage={currentPage}
+          binderName={binderName}
+          isEditingName={isEditingName}
+          tempName={tempName}
+          onStartNameEdit={onStartNameEdit}
+          onSaveNameEdit={onSaveNameEdit}
+          onCancelNameEdit={onCancelNameEdit}
+          onNameChange={onNameChange}
+          onNameKeyPress={onNameKeyPress}
           isDirty={isDirty}
           onSave={onSave}
           onRevert={onRevert}
@@ -110,8 +146,15 @@ const WorkspaceLayout = ({
           clipboard={clipboard}
           isCollapsed={sidebarCollapsed}
           onToggleCollapsed={() => setSidebarCollapsed(!sidebarCollapsed)}
+          binderId={binderId}
         />
       </AnimatePresence>
+
+      {/* Edit History Panel */}
+      <EditHistoryPanel
+        isOpen={isHistoryPanelOpen}
+        onClose={() => setIsHistoryPanelOpen(false)}
+      />
     </div>
   );
 };

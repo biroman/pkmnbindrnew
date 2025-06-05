@@ -13,6 +13,7 @@ import {
   getUserProfile,
   getUserBinders,
   getUserPreferences,
+  getBindersForUser,
 } from "../services/firestore";
 
 // Helper to get user document reference
@@ -149,9 +150,10 @@ export const useRealtimeUserBinders = (userId, options = {}) => {
   }, [userId, options, queryClient]);
 
   return useQuery({
-    queryKey: ["userBinders", userId, options],
-    queryFn: () => getUserBinders(userId, options),
+    queryKey: ["userBindersRealtime", userId, options],
+    queryFn: () => getBindersForUser(userId),
     enabled: !!userId,
+    refetchInterval: options.refetchInterval || false,
     staleTime: Infinity, // Never stale since real-time updates
   });
 };

@@ -5,17 +5,71 @@
  * This hook is used throughout the app to enforce limits and show appropriate messaging.
  */
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { db } from "../config/firebase";
 import {
-  getUserLimits,
+  getUserLimits as getLocalUserLimits,
   isFeatureAvailable,
   getLimitMessage,
   checkLimitWarnings,
   STORAGE_ESTIMATES,
   UPGRADE_INCENTIVES,
   WARNING_THRESHOLDS,
+  USER_LIMITS as LOCAL_USER_LIMITS,
 } from "../config/userLimits";
+
+/**
+ * Hook to get system limits from Firebase
+ * Similar to usePageLimits but for all user limits
+ */
+export const useSystemLimits = () => {
+  const [systemLimits, setSystemLimits] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const configRef = doc(db, "systemConfiguration", "limits");
+
+    const unsubscribe = onSnapshot(
+      configRef,
+      (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          setSystemLimits({
+            guest: {
+              maxBinders: data.guestMaxBinders,
+              maxCardsPerBinder: data.guestMaxCardsPerBinder,
+              maxPages: data.guestMaxPages,
+            },
+            registered: {
+              maxBinders: data.registeredMaxBinders,
+              maxCardsPerBinder: data.registeredMaxCardsPerBinder,
+              maxPages: data.registeredMaxPages,
+            },
+            enforcement: {
+              ENFORCE_BINDER_LIMITS: data.enforceBinnerLimits,
+              ENFORCE_CARD_LIMITS: data.enforceCardLimits,
+              ENFORCE_STORAGE_WARNINGS: data.enforceStorageWarnings,
+              ENFORCE_FEATURE_LOCKS: data.enforceFeatureLocks,
+              STRICT_MODE: data.strictMode,
+            },
+            warningThresholds: data.warningThresholds,
+          });
+        }
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching system limits:", error);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  return { systemLimits, isLoading };
+};
 
 /**
  * Helper function to format bytes
@@ -31,19 +85,44 @@ const formatBytes = (bytes) => {
 };
 
 export const useUserLimits = () => {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
+  const { systemLimits, isLoading: systemLimitsLoading } = useSystemLimits();
 
-  // Get current user limits
-  const limits = useMemo(() => getUserLimits(user), [user]);
+  // Get current user limits - prefer Firebase system limits over local config
+  const limits = useMemo(() => {
+    if (systemLimitsLoading) {
+      // While loading, use local config as fallback
+      return getLocalUserLimits(currentUser);
+    }
+
+    if (systemLimits) {
+      // Use Firebase system limits if available
+      const userType = currentUser ? "registered" : "guest";
+      const systemUserLimits = systemLimits[userType];
+      const localLimits = getLocalUserLimits(currentUser);
+
+      // Merge system limits with local config (Firebase takes precedence for numeric limits)
+      return {
+        ...localLimits,
+        maxBinders: systemUserLimits?.maxBinders ?? localLimits.maxBinders,
+        maxCardsPerBinder:
+          systemUserLimits?.maxCardsPerBinder ?? localLimits.maxCardsPerBinder,
+        maxPages: systemUserLimits?.maxPages ?? localLimits.maxPages,
+      };
+    }
+
+    // Fallback to local config
+    return getLocalUserLimits(currentUser);
+  }, [currentUser, systemLimits, systemLimitsLoading]);
 
   // User type information
   const userInfo = useMemo(
     () => ({
-      isGuest: !user,
-      isRegistered: !!user,
-      userType: user ? "registered" : "guest",
+      isGuest: !currentUser,
+      isRegistered: !!currentUser,
+      userType: currentUser ? "registered" : "guest",
     }),
-    [user]
+    [currentUser]
   );
 
   // Limit checking functions
@@ -69,18 +148,35 @@ export const useUserLimits = () => {
     [limits.maxCardsPerBinder]
   );
 
+  const canAddPage = useCallback(
+    (currentPageCount) => {
+      // If limits are effectively unlimited, always allow
+      if (limits.maxPages === Number.MAX_SAFE_INTEGER) {
+        return true;
+      }
+      return currentPageCount < limits.maxPages;
+    },
+    [limits.maxPages]
+  );
+
   const canUseFeature = useCallback(
     (featureName) => {
-      return isFeatureAvailable(featureName, user);
+      return isFeatureAvailable(featureName, currentUser);
     },
-    [user]
+    [currentUser]
   );
 
   // Get remaining capacity
   const getRemainingCapacity = useCallback(
     (type, currentCount) => {
       const limit =
-        type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+        type === "binders"
+          ? limits.maxBinders
+          : type === "cards"
+          ? limits.maxCardsPerBinder
+          : type === "pages"
+          ? limits.maxPages
+          : null;
 
       // If unlimited, return a large number for display purposes
       if (limit === Number.MAX_SAFE_INTEGER) {
@@ -96,7 +192,13 @@ export const useUserLimits = () => {
   const getUsagePercentage = useCallback(
     (type, currentCount) => {
       const limit =
-        type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+        type === "binders"
+          ? limits.maxBinders
+          : type === "cards"
+          ? limits.maxCardsPerBinder
+          : type === "pages"
+          ? limits.maxPages
+          : null;
 
       // If unlimited, always return 0% usage
       if (limit === Number.MAX_SAFE_INTEGER) {
@@ -112,7 +214,13 @@ export const useUserLimits = () => {
   const isApproachingLimit = useCallback(
     (type, currentCount, threshold = null) => {
       const limit =
-        type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+        type === "binders"
+          ? limits.maxBinders
+          : type === "cards"
+          ? limits.maxCardsPerBinder
+          : type === "pages"
+          ? limits.maxPages
+          : null;
 
       // If unlimited, never approaching limit
       if (limit === Number.MAX_SAFE_INTEGER) {
@@ -122,7 +230,11 @@ export const useUserLimits = () => {
       const defaultThreshold =
         type === "binders"
           ? WARNING_THRESHOLDS.BINDER_WARNING
-          : WARNING_THRESHOLDS.CARD_WARNING;
+          : type === "cards"
+          ? WARNING_THRESHOLDS.CARD_WARNING
+          : type === "pages"
+          ? WARNING_THRESHOLDS.BINDER_WARNING // Use binder warning threshold for pages
+          : WARNING_THRESHOLDS.BINDER_WARNING;
 
       const usedThreshold = threshold || defaultThreshold;
       return getUsagePercentage(type, currentCount) >= usedThreshold;
@@ -134,7 +246,13 @@ export const useUserLimits = () => {
   const getWarningMessage = useCallback(
     (type, currentCount) => {
       const limit =
-        type === "binders" ? limits.maxBinders : limits.maxCardsPerBinder;
+        type === "binders"
+          ? limits.maxBinders
+          : type === "cards"
+          ? limits.maxCardsPerBinder
+          : type === "pages"
+          ? limits.maxPages
+          : null;
 
       // If unlimited, no warning messages for capacity
       if (limit === Number.MAX_SAFE_INTEGER) {
@@ -144,14 +262,24 @@ export const useUserLimits = () => {
       const percentage = getUsagePercentage(type, currentCount);
 
       if (percentage >= 100) {
-        return getLimitMessage(
-          type === "binders" ? "BINDER_LIMIT_REACHED" : "CARD_LIMIT_REACHED",
-          userInfo.userType
-        );
+        const limitReachedKey =
+          type === "binders"
+            ? "BINDER_LIMIT_REACHED"
+            : type === "cards"
+            ? "CARD_LIMIT_REACHED"
+            : type === "pages"
+            ? "PAGE_LIMIT_REACHED"
+            : "BINDER_LIMIT_REACHED";
+
+        return getLimitMessage(limitReachedKey, userInfo.userType);
       } else if (
         percentage >=
         WARNING_THRESHOLDS[
-          type === "binders" ? "BINDER_WARNING" : "CARD_WARNING"
+          type === "binders"
+            ? "BINDER_WARNING"
+            : type === "cards"
+            ? "CARD_WARNING"
+            : "BINDER_WARNING" // Use binder warning for pages
         ]
       ) {
         return `You're using ${percentage}% of your ${type} limit (${currentCount}/${limit})`;
@@ -243,9 +371,9 @@ export const useUserLimits = () => {
   // Comprehensive limit check
   const checkAllLimits = useCallback(
     (binderCount, cardCounts = {}) => {
-      return checkLimitWarnings(user, binderCount, cardCounts);
+      return checkLimitWarnings(currentUser, binderCount, cardCounts);
     },
-    [user]
+    [currentUser]
   );
 
   // Validation helpers
@@ -340,6 +468,7 @@ export const useUserLimits = () => {
     // Capacity checks
     canCreateBinder,
     canAddCard,
+    canAddPage,
     canUseFeature,
 
     // Usage information
@@ -421,6 +550,46 @@ export const useCardLimits = (currentCardCount) => {
     isUnlimited,
     warningMessage: getWarningMessage("cards", currentCardCount),
     validation: validateAction("addCard", { cards: currentCardCount }),
+  };
+};
+
+/**
+ * Hook for page-specific limit checks
+ */
+export const usePageLimits = (currentPageCount) => {
+  const {
+    canAddPage,
+    getRemainingCapacity,
+    getUsagePercentage,
+    isApproachingLimit,
+    getWarningMessage,
+    limits,
+    userType,
+  } = useUserLimits();
+
+  const isUnlimited = limits.maxPages === Number.MAX_SAFE_INTEGER;
+
+  // Generate a user-friendly reason for page limits
+  const getPageLimitReason = () => {
+    if (userType === "guest") {
+      return "To keep our servers running smoothly and provide the best experience for everyone, we limit the number of pages per binder for guest users. Create a free account to unlock higher limits!";
+    } else {
+      return "To ensure optimal performance and manage server costs, we limit the number of pages per binder. This helps us keep the service free and fast for all users.";
+    }
+  };
+
+  return {
+    canAdd: canAddPage(currentPageCount),
+    remaining: isUnlimited
+      ? "Unlimited"
+      : getRemainingCapacity("pages", currentPageCount),
+    usagePercentage: getUsagePercentage("pages", currentPageCount),
+    isApproaching: isApproachingLimit("pages", currentPageCount),
+    isUnlimited,
+    warningMessage: getWarningMessage("pages", currentPageCount),
+    limitReason: getPageLimitReason(),
+    maxPages: limits.maxPages,
+    isAtLimit: !canAddPage(currentPageCount),
   };
 };
 

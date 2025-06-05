@@ -3,7 +3,7 @@ import { useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import {
   getUserProfile,
-  getUserBinders,
+  getBindersForUser,
   getUserPreferences,
   getUserActivity,
   getAdminStats,
@@ -40,7 +40,7 @@ export const usePrefetchUserData = (userId) => {
 
       await queryClient.prefetchQuery({
         queryKey: ["userBinders", userId, options],
-        queryFn: () => getUserBinders(userId, options),
+        queryFn: () => getBindersForUser(userId),
         staleTime: 1000 * 60 * 5, // 5 minutes
       });
     },
@@ -109,7 +109,7 @@ export const useRoutePrefetching = (userId, userRole) => {
             }),
             queryClient.prefetchQuery({
               queryKey: ["userBinders", userId, { limit: 5 }],
-              queryFn: () => getUserBinders(userId, { limit: 5 }),
+              queryFn: () => getBindersForUser(userId, { limit: 5 }),
             }),
             queryClient.prefetchQuery({
               queryKey: ["userActivity", userId, 5],
@@ -122,7 +122,7 @@ export const useRoutePrefetching = (userId, userRole) => {
           // Prefetch more binders for collections page
           await queryClient.prefetchQuery({
             queryKey: ["userBinders", userId, { limit: 20 }],
-            queryFn: () => getUserBinders(userId, { limit: 20 }),
+            queryFn: () => getBindersForUser(userId, { limit: 20 }),
           });
           break;
 
@@ -206,11 +206,11 @@ export const usePredictivePrefetching = (userId) => {
       await Promise.all([
         queryClient.prefetchQuery({
           queryKey: ["userBinders", userId, { limit: 50 }],
-          queryFn: () => getUserBinders(userId, { limit: 50 }),
+          queryFn: () => getBindersForUser(userId, { limit: 50 }),
         }),
         queryClient.prefetchQuery({
           queryKey: ["userBinders", userId, { isFavorite: true }],
-          queryFn: () => getUserBinders(userId, { isFavorite: true }),
+          queryFn: () => getBindersForUser(userId, { isFavorite: true }),
         }),
       ]);
     }

@@ -1,250 +1,201 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../contexts/AuthContext";
 import { parseGridSize } from "../utils/gridUtils";
+import {
+  getCardsForPages,
+  addCardToBinder,
+  updateCardInBinder,
+  removeCardFromBinder,
+  // getAllCardsInBinder, // If needed for other features
+} from "../services/firestore";
+import { useCacheInvalidation } from "./useCacheInvalidation";
 
 /**
- * Hook for managing complete binder state
- * @param {string} binderId - Unique binder identifier
- * @param {string} gridSize - Grid size preference
- * @param {Object} options - Additional options
+ * Hook for managing the state of cards within a specific binder, connected to Firestore.
+ * @param {string} binderId - The ID of the binder.
+ * @param {object} binderPreferences - The preferences object for this binder (contains gridSize, pageCount, etc.).
+ * @param {number} currentPage - The current single page number being viewed (1-indexed).
  */
-export const useBinderState = (binderId, gridSize = "3x3", options = {}) => {
-  const {
-    defaultPages = 10, // Default number of page spreads
-    autoSave = true,
-  } = options;
+export const useBinderState = (binderId, binderPreferences, currentPage) => {
+  const { currentUser } = useAuth();
+  const { invalidateCardData } = useCacheInvalidation();
 
-  const { totalSlots } = parseGridSize(gridSize);
-  const slotsPerSpread = totalSlots * 2; // Both pages in a spread
+  const { gridSize = "3x3", pageCount = 1 } = binderPreferences || {};
+  const { totalSlots: slotsPerPage } = parseGridSize(gridSize);
 
-  // State
-  const [currentPageSpread, setCurrentPageSpread] = useState(1);
-  const [cards, setCards] = useState({}); // { slotNumber: cardData }
-  const [totalPageSpreads, setTotalPageSpreads] = useState(defaultPages);
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
+  // Determine the actual page numbers visible in the current spread
+  let visiblePageNumbers = [];
+  if (pageCount > 0 && currentPage > 0) {
+    if (currentPage === 1) {
+      // First spread usually shows only actual page 1 on the right
+      visiblePageNumbers = [1];
+    } else {
+      // Subsequent spreads: left page is (spreadNum - 1) * 2, right is left + 1
+      const leftActualPage = (currentPage - 1) * 2;
+      const rightActualPage = leftActualPage + 1;
 
-  // Calculate current page numbers
-  const currentPages = useMemo(() => {
-    const leftPage = (currentPageSpread - 1) * 2 + 1;
-    const rightPage = leftPage + 1;
-    return { left: leftPage, right: rightPage };
-  }, [currentPageSpread]);
-
-  // Calculate slot ranges for current spread
-  const currentSlotRange = useMemo(() => {
-    const startSlot = (currentPageSpread - 1) * slotsPerSpread + 1;
-    const endSlot = startSlot + slotsPerSpread - 1;
-    const leftPageStart = startSlot;
-    const leftPageEnd = startSlot + totalSlots - 1;
-    const rightPageStart = leftPageEnd + 1;
-    const rightPageEnd = endSlot;
-
-    return {
-      total: { start: startSlot, end: endSlot },
-      leftPage: { start: leftPageStart, end: leftPageEnd },
-      rightPage: { start: rightPageStart, end: rightPageEnd },
-    };
-  }, [currentPageSpread, slotsPerSpread, totalSlots]);
-
-  // Navigation functions
-  const goToPageSpread = useCallback(
-    (pageSpread) => {
-      if (pageSpread >= 1 && pageSpread <= totalPageSpreads) {
-        setCurrentPageSpread(pageSpread);
+      if (leftActualPage <= pageCount) {
+        visiblePageNumbers.push(leftActualPage);
       }
-    },
-    [totalPageSpreads]
-  );
-
-  const nextPageSpread = useCallback(() => {
-    if (currentPageSpread < totalPageSpreads) {
-      setCurrentPageSpread((prev) => prev + 1);
+      if (rightActualPage <= pageCount) {
+        visiblePageNumbers.push(rightActualPage);
+      }
     }
-  }, [currentPageSpread, totalPageSpreads]);
+    // Ensure no duplicates and pages are valid
+    visiblePageNumbers = [...new Set(visiblePageNumbers)].filter((p) => p > 0);
+  }
 
-  const previousPageSpread = useCallback(() => {
-    if (currentPageSpread > 1) {
-      setCurrentPageSpread((prev) => prev - 1);
-    }
-  }, [currentPageSpread]);
+  // **OPTIMIZED**: Calculate a range of pages to fetch (current + adjacent) to reduce requests
+  const pageRange = useMemo(() => {
+    if (!pageCount || pageCount <= 0) return [];
 
-  // Card management functions
-  const addCard = useCallback((slotNumber, cardData) => {
-    setCards((prev) => ({
-      ...prev,
-      [slotNumber]: {
-        ...cardData,
-        slotNumber,
-        addedAt: new Date().toISOString(),
-      },
-    }));
-  }, []);
+    // Fetch a window of pages around the current view to reduce Firebase requests
+    const windowSize = 4; // Fetch 4 pages at a time (2 before, current spread, 1 after)
+    const minPage = Math.max(1, Math.min(...visiblePageNumbers) - 1);
+    const maxPage = Math.min(pageCount, Math.max(...visiblePageNumbers) + 1);
 
-  const removeCard = useCallback((slotNumber) => {
-    setCards((prev) => {
-      const newCards = { ...prev };
-      delete newCards[slotNumber];
-      return newCards;
-    });
-  }, []);
-
-  const moveCard = useCallback((fromSlot, toSlot) => {
-    setCards((prev) => {
-      const cardToMove = prev[fromSlot];
-      if (!cardToMove) return prev;
-
-      const newCards = { ...prev };
-
-      // Remove from old slot
-      delete newCards[fromSlot];
-
-      // Add to new slot (if not occupied)
-      if (!newCards[toSlot]) {
-        newCards[toSlot] = {
-          ...cardToMove,
-          slotNumber: toSlot,
-          movedAt: new Date().toISOString(),
-        };
-      }
-
-      return newCards;
-    });
-  }, []);
-
-  const swapCards = useCallback((slot1, slot2) => {
-    setCards((prev) => {
-      const card1 = prev[slot1];
-      const card2 = prev[slot2];
-
-      const newCards = { ...prev };
-
-      if (card1) {
-        newCards[slot2] = { ...card1, slotNumber: slot2 };
-      } else {
-        delete newCards[slot2];
-      }
-
-      if (card2) {
-        newCards[slot1] = { ...card2, slotNumber: slot1 };
-      } else {
-        delete newCards[slot1];
-      }
-
-      return newCards;
-    });
-  }, []);
-
-  // Utility functions
-  const getCard = useCallback(
-    (slotNumber) => {
-      return cards[slotNumber] || null;
-    },
-    [cards]
-  );
-
-  const isSlotEmpty = useCallback(
-    (slotNumber) => {
-      return !cards[slotNumber];
-    },
-    [cards]
-  );
-
-  const getCurrentSpreadCards = useCallback(() => {
-    const spreadCards = {};
+    const rangeTofetch = [];
     for (
-      let slot = currentSlotRange.total.start;
-      slot <= currentSlotRange.total.end;
-      slot++
+      let i = minPage;
+      i <= maxPage && rangeTofetch.length < windowSize;
+      i++
     ) {
-      if (cards[slot]) {
-        spreadCards[slot] = cards[slot];
-      }
+      rangeTofetch.push(i);
     }
-    return spreadCards;
-  }, [cards, currentSlotRange]);
 
-  const getTotalCards = useCallback(() => {
-    return Object.keys(cards).length;
-  }, [cards]);
+    return rangeTofetch;
+  }, [visiblePageNumbers, pageCount]);
 
-  const getFilledSlots = useCallback(() => {
-    return Object.keys(cards)
-      .map(Number)
-      .sort((a, b) => a - b);
-  }, [cards]);
-
-  // Add more pages if needed
-  const addPageSpread = useCallback(() => {
-    setTotalPageSpreads((prev) => prev + 1);
-  }, []);
-
-  const removeLastPageSpread = useCallback(() => {
-    if (totalPageSpreads > 1) {
-      // Remove cards from slots that would be deleted
-      const slotsToRemove = [];
-      const lastSpreadStart = (totalPageSpreads - 1) * slotsPerSpread + 1;
-      const lastSpreadEnd = totalPageSpreads * slotsPerSpread;
-
-      for (let slot = lastSpreadStart; slot <= lastSpreadEnd; slot++) {
-        if (cards[slot]) {
-          slotsToRemove.push(slot);
-        }
+  const {
+    data: queryResult, // Rename to avoid conflict with error, isLoading from hook itself
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    // **OPTIMIZED**: Use page range in query key to cache broader page ranges
+    queryKey: [
+      "binderCards",
+      binderId,
+      currentUser?.uid,
+      pageRange.join(","), // Only changes when we need to fetch different page ranges
+    ],
+    queryFn: async () => {
+      if (!currentUser?.uid || !binderId || pageRange.length === 0) {
+        return { success: true, cards: [], error: null };
+      }
+      if (!binderPreferences || typeof pageCount !== "number") {
+        console.warn(
+          "useBinderState: Preferences (or pageCount) not fully loaded. Skipping card fetch."
+        );
+        return { success: true, cards: [], error: "Preferences not loaded" };
       }
 
-      if (slotsToRemove.length > 0) {
-        setCards((prev) => {
-          const newCards = { ...prev };
-          slotsToRemove.forEach((slot) => delete newCards[slot]);
-          return newCards;
-        });
-      }
+      console.log(
+        `🔥 OPTIMIZED: Fetching cards for binder ${binderId}, page range: ${pageRange} (visible: ${visiblePageNumbers})`
+      );
+      return getCardsForPages(currentUser.uid, binderId, pageRange);
+    },
+    enabled:
+      !!currentUser?.uid &&
+      !!binderId &&
+      pageRange.length > 0 &&
+      !!binderPreferences &&
+      typeof pageCount === "number",
+    staleTime: 1000 * 60 * 5, // **OPTIMIZED**: 5 minutes - aggressive caching
+    gcTime: 1000 * 60 * 10, // **OPTIMIZED**: Keep in cache for 10 minutes
+    refetchOnWindowFocus: false, // **OPTIMIZED**: Don't refetch on window focus
+    refetchOnMount: false, // **OPTIMIZED**: Don't refetch on remount if data exists
+    // keepPreviousData: true, // Consider for smoother transitions if needed
+  });
 
-      setTotalPageSpreads((prev) => prev - 1);
+  // **OPTIMIZED**: Filter fetched cards to only show cards for currently visible pages
+  const allFetchedCards = queryResult?.success ? queryResult.cards || [] : [];
+  const visibleCards = allFetchedCards.filter((card) =>
+    visiblePageNumbers.includes(card.pageNumber)
+  );
+  const fetchError = queryResult?.error || error; // Combine query error with service error
 
-      // Move to previous spread if current one was deleted
-      if (currentPageSpread >= totalPageSpreads) {
-        setCurrentPageSpread(totalPageSpreads - 1);
-      }
+  // Mutations with comprehensive cache invalidation
+  const mutationOptions = {
+    onSuccess: () => {
+      // Use centralized cache invalidation for card operations
+      invalidateCardData(currentUser.uid, binderId);
+    },
+  };
+
+  const addCardMutation = useMutation({
+    mutationFn: (cardData) =>
+      addCardToBinder(currentUser.uid, binderId, cardData),
+    ...mutationOptions,
+  });
+
+  const removeCardMutation = useMutation({
+    mutationFn: (cardEntryId) =>
+      removeCardFromBinder(currentUser.uid, binderId, cardEntryId),
+    ...mutationOptions,
+  });
+
+  const updateCardMutation = useMutation({
+    mutationFn: ({ cardEntryId, updates }) =>
+      updateCardInBinder(currentUser.uid, binderId, cardEntryId, updates),
+    ...mutationOptions,
+  });
+
+  // Assign cards to their respective pages for the spread
+  // This assumes `currentPage` aligns with the logic in `getVisiblePageNumbers`
+  let cardsOnPage1 = [];
+  let cardsOnPage2 = [];
+
+  if (visiblePageNumbers.length > 0) {
+    if (currentPage === 1) {
+      cardsOnPage1 = visibleCards.filter((card) => card.pageNumber === 1);
+    } else {
+      const leftActualPage = (currentPage - 1) * 2;
+      const rightActualPage = leftActualPage + 1;
+      cardsOnPage1 = visibleCards.filter(
+        (card) => card.pageNumber === leftActualPage
+      );
+      cardsOnPage2 = visibleCards.filter(
+        (card) => card.pageNumber === rightActualPage
+      );
     }
-  }, [totalPageSpreads, currentPageSpread, cards, slotsPerSpread]);
+  }
+
+  // Helper to get card in a specific slot (pageNumber is actual page, not spread number)
+  const getCardInSlot = (actualPageNumber, slotInPage) => {
+    return (
+      allFetchedCards.find(
+        // Use allFetchedCards (broader range) for slot checking
+        (card) =>
+          card.pageNumber === actualPageNumber && card.slotInPage === slotInPage
+      ) || null
+    );
+  };
+
+  const isSlotEmpty = (actualPageNumber, slotInPage) => {
+    return !getCardInSlot(actualPageNumber, slotInPage);
+  };
+
+  // Recalculate totalSlots based on actual pageCount from preferences
+  const totalPossibleSlots = pageCount * slotsPerPage;
 
   return {
-    // State
-    currentPageSpread,
-    totalPageSpreads,
-    cards,
+    cardsOnPage1,
+    cardsOnPage2,
+    allVisibleCards: visibleCards, // **OPTIMIZED**: Return only visible cards, not the broader range
     isLoading,
-    lastSaved,
-
-    // Current context
-    currentPages,
-    currentSlotRange,
-
-    // Navigation
-    goToPageSpread,
-    nextPageSpread,
-    previousPageSpread,
-    canGoNext: currentPageSpread < totalPageSpreads,
-    canGoPrevious: currentPageSpread > 1,
-
-    // Card management
-    addCard,
-    removeCard,
-    moveCard,
-    swapCards,
-    getCard,
+    error: fetchError,
+    refetchCards: refetch,
+    addCard: addCardMutation.mutateAsync,
+    removeCard: removeCardMutation.mutateAsync,
+    moveCard: updateCardMutation.mutateAsync,
+    getCardInSlot,
     isSlotEmpty,
-
-    // Utilities
-    getCurrentSpreadCards,
-    getTotalCards,
-    getFilledSlots,
-    addPageSpread,
-    removeLastPageSpread,
-
-    // Stats
-    totalSlots: totalPageSpreads * slotsPerSpread,
-    filledSlots: getTotalCards(),
-    emptySlots: totalPageSpreads * slotsPerSpread - getTotalCards(),
+    isAddingCard: addCardMutation.isLoading,
+    isRemovingCard: removeCardMutation.isLoading,
+    isUpdatingCard: updateCardMutation.isLoading,
+    slotsPerPage,
+    totalPossibleSlots, // Total slots in the entire binder based on pageCount
   };
 };

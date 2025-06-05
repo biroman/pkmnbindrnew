@@ -40,7 +40,7 @@ const Button = forwardRef(
     const Comp = asChild ? Slot : "button";
 
     const baseClasses =
-      "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+      "inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 text-gray-900 dark:text-white focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
 
     return (
       <Comp

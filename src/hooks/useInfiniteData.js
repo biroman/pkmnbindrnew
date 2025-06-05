@@ -6,6 +6,7 @@ import {
   getUserBinders,
   getUserActivity,
   getAllUsers,
+  getBindersForUser,
 } from "../services/firestore";
 
 // Helper to get user subcollection reference
@@ -14,66 +15,27 @@ const getUserSubcollection = (userId, subcollection) =>
 
 // ===== INFINITE USER BINDERS =====
 
-export const useInfiniteUserBinders = (userId, options = {}) => {
-  const {
-    pageSize = 10,
-    sortBy = "dateCreated",
-    sortOrder = "desc",
-    filters = {},
-    enableVirtualScrolling = false,
-  } = options;
-
+export const useInfiniteUserBinders = (userId, queryOptions = {}) => {
   return useInfiniteQuery({
-    queryKey: [
-      "infiniteUserBinders",
-      userId,
-      pageSize,
-      sortBy,
-      sortOrder,
-      filters,
-    ],
+    queryKey: ["userBindersInfinite", userId],
     queryFn: async ({ pageParam = null }) => {
-      if (!userId) {
+      if (pageParam === null || pageParam === undefined) {
+        const result = await getBindersForUser(userId);
         return {
-          data: [],
+          data: result.binders || [],
           nextCursor: null,
-          hasNextPage: false,
-          totalCount: 0,
+          error: result.error,
+          success: result.success,
         };
-      }
-
-      try {
-        // Try to get real binder data first
-        const result = await getUserBinders(userId, {
-          limit: pageSize,
-          startAfter: pageParam,
-          sortBy,
-          sortOrder,
-          ...filters,
-        });
-
-        return {
-          data: result.data || [],
-          nextCursor: result.nextCursor,
-          hasNextPage: result.hasNextPage,
-          totalCount: result.totalCount || 0,
-        };
-      } catch (error) {
-        // If binders collection doesn't exist or there's an error, return empty data
-        console.log("Binders collection not found or error:", error.message);
-        return {
-          data: [],
-          nextCursor: null,
-          hasNextPage: false,
-          totalCount: 0,
-        };
+      } else {
+        return { data: [], nextCursor: null, success: true };
       }
     },
     getNextPageParam: (lastPage) => {
-      return lastPage.hasNextPage ? lastPage.nextCursor : undefined;
+      return undefined;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!userId,
+    ...queryOptions,
   });
 };
 

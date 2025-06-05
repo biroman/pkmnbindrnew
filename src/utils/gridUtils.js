@@ -59,6 +59,24 @@ export const calculateBinderDimensions = (
     xl: 1280,
   };
 
+  // Grid-specific scaling factors to ensure proper fit
+  const getScalingFactor = (gridSize) => {
+    switch (gridSize) {
+      case "4x3":
+        return 0.9; // Make 4x3 smaller to fit better
+      case "4x4":
+        return 1.0; // Make 4x4 even smaller
+      case "1x1":
+        return 1.0; // Allow 1x1 to be larger
+      case "2x2":
+        return 1.0; // Allow 2x2 to be slightly larger
+      default:
+        return 1.0; // Default for 3x3
+    }
+  };
+
+  const scalingFactor = getScalingFactor(gridSize);
+
   // Calculate available space
   const padding = viewportWidth >= breakpoints.md ? 32 : 16;
   const availableWidth = viewportWidth - padding * 2;
@@ -69,8 +87,8 @@ export const calculateBinderDimensions = (
 
   if (isMobile) {
     // Mobile: Single page layout (stacked)
-    const widthUsage = 0.9;
-    const heightUsage = 0.85;
+    const widthUsage = 0.9 * scalingFactor;
+    const heightUsage = 0.85 * scalingFactor;
 
     const maxCardWidth = (availableWidth * widthUsage) / cols;
     const maxCardHeight = (availableHeight * heightUsage) / rows;
@@ -99,8 +117,8 @@ export const calculateBinderDimensions = (
     };
   } else {
     // Desktop: Dual page layout (side by side)
-    const widthUsage = 0.85; // Leave more room for dual pages
-    const heightUsage = 0.9;
+    const widthUsage = 0.85 * scalingFactor; // Apply scaling factor
+    const heightUsage = 0.9 * scalingFactor;
 
     // Available width for both pages combined (minus binding space)
     const totalGridWidth = availableWidth * widthUsage - bindingWidth;

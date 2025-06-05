@@ -109,10 +109,11 @@ const ForgotPasswordModal = ({ isOpen, onClose, onSendReset }) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full"
+                placeholder="Enter your email address"
+                className="mb-4"
                 disabled={loading}
                 autoFocus
+                maxLength={100}
               />
             </div>
 
@@ -294,6 +295,7 @@ const LoginForm = ({ onToggleMode }) => {
                   ? "border-red-500 focus:border-red-500 focus:ring-red-500"
                   : ""
               }
+              maxLength={100}
               required
               autoComplete="email"
             />
@@ -333,6 +335,7 @@ const LoginForm = ({ onToggleMode }) => {
                     ? "border-red-500 focus:border-red-500 focus:ring-red-500 pr-10"
                     : "pr-10"
                 }
+                maxLength={128}
                 required
                 autoComplete="current-password"
               />

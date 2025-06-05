@@ -48,7 +48,6 @@ export const StorageProvider = ({ children }) => {
           setCurrentAdapter(mockFirebaseAdapter); // Will be firebaseAdapter in Phase 4
         } else {
           // Use IndexedDB for anonymous users
-          console.log("Using IndexedDB storage for anonymous user");
           await indexedDBAdapter.init();
           setCurrentAdapter(indexedDBAdapter);
         }

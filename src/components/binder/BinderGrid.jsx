@@ -20,7 +20,7 @@ import {
   swapCards,
 } from "../../utils/cardMovement";
 import { useParams } from "react-router-dom";
-import { usePendingChanges } from "../../hooks/usePendingChanges";
+// Removed usePendingChanges - using new local storage system
 
 /**
  * BinderGrid - Flexible grid component for Pokemon card binder with drag and drop
@@ -33,6 +33,7 @@ import { usePendingChanges } from "../../hooks/usePendingChanges";
  * @param {Array} allCards - All cards in the binder (for drag validation)
  * @param {Function} onCardMove - Callback for successful card moves
  * @param {boolean} isDragEnabled - Whether drag and drop is enabled
+ * @param {boolean} isControlledByParent - Whether this grid is controlled by a parent DndContext
  */
 const BinderGrid = ({
   gridDimensions,
@@ -44,16 +45,16 @@ const BinderGrid = ({
   allCards = [],
   onCardMove,
   isDragEnabled = true,
+  isControlledByParent = false,
   ...props
 }) => {
   const { binderId } = useParams();
-  const { pendingCards } = usePendingChanges(binderId);
   const [activeId, setActiveId] = useState(null);
   const [isMoving, setIsMoving] = useState(false);
 
   const { cols, rows, totalSlots } = parseGridSize(gridSize);
 
-  // Set up sensors for drag and drop
+  // Set up sensors for drag and drop (only if not controlled by parent)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -88,7 +89,7 @@ const BinderGrid = ({
     [savedCards, gridSize]
   );
 
-  // Get card being dragged for overlay
+  // Get card being dragged for overlay (only if not controlled by parent)
   const getActiveCard = useCallback(() => {
     if (!activeId) return null;
     const dragInfo = parseDragId(activeId);
@@ -98,12 +99,12 @@ const BinderGrid = ({
     return null;
   }, [activeId, allCards]);
 
-  // Handle drag start
+  // Handle drag start (only if not controlled by parent)
   const handleDragStart = useCallback((event) => {
     setActiveId(event.active.id);
   }, []);
 
-  // Handle drag end
+  // Handle drag end (only if not controlled by parent)
   const handleDragEnd = useCallback(
     (event) => {
       const { active, over } = event;
@@ -121,11 +122,32 @@ const BinderGrid = ({
         cardId: over.data.current.cardId,
       };
 
-      // Validate the move
-      const validation = validateCardMove(sourceInfo, targetInfo, allCards);
+      // Get fresh card data right before validation to include newly added cards
+      const freshCards = allCards.length > 0 ? allCards : [];
+
+      // Also try to get cards from saved cards if allCards is stale
+      const combinedCards = [...freshCards];
+      savedCards.forEach((card) => {
+        if (!combinedCards.find((c) => c.id === card.id)) {
+          combinedCards.push(card);
+        }
+      });
+
+      // Validate the move with the most up-to-date card data
+      const validation = validateCardMove(
+        sourceInfo,
+        targetInfo,
+        combinedCards,
+        binderId
+      );
 
       if (!validation.isValid) {
         console.warn("Invalid move:", validation.reason);
+        console.log(
+          "Available cards for validation:",
+          combinedCards.map((c) => c.id)
+        );
+        console.log("Looking for card ID:", sourceInfo.cardId);
         return;
       }
 
@@ -159,8 +181,8 @@ const BinderGrid = ({
 
           // Force immediate UI update by dispatching custom event
           window.dispatchEvent(
-            new CustomEvent("cardMoved", {
-              detail: { binderId, result },
+            new CustomEvent("localBinderUpdate", {
+              detail: { binderId, type: "cardMove", result },
             })
           );
 
@@ -177,24 +199,75 @@ const BinderGrid = ({
         setIsMoving(false);
       }
     },
-    [allCards, binderId, gridSize, onCardMove]
+    [allCards, savedCards, binderId, gridSize, onCardMove]
   );
 
-  // Check if a card is pending (and thus should not be draggable)
-  const isCardPending = useCallback(
-    (card) => {
-      if (!card) return false;
-      return pendingCards.some(
-        (pendingCard) =>
-          pendingCard.pageNumber === card.pageNumber &&
-          pendingCard.slotInPage === card.slotInPage
-      );
-    },
-    [pendingCards]
-  );
+  // In the new system, all cards are immediately saved to local storage
+  // so there's no concept of "pending" cards that can't be dragged
+  const isCardPending = useCallback(() => false, []);
 
   const activeCard = getActiveCard();
 
+  // Grid content component
+  const GridContent = () => (
+    <div className="flex flex-col items-center justify-center h-full p-2">
+      {/* Grid container */}
+      <div
+        className="grid group"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+          width: `${gridDimensions.gridWidth}px`,
+          height: `${gridDimensions.gridHeight}px`,
+          gap: `${gridDimensions.gap}px`,
+          maxWidth: "95vw",
+          maxHeight: "95vh",
+        }}
+      >
+        {gridSlots.map((slot) => {
+          const savedCard = getSavedCardForSlot(slot);
+          const isPending = isCardPending(savedCard);
+
+          return (
+            <DraggableCardSlot
+              key={slot}
+              slot={slot}
+              cardWidth={gridDimensions.cardWidth}
+              cardHeight={gridDimensions.cardHeight}
+              onAddCard={onAddCard}
+              savedCard={savedCard}
+              gridSize={gridSize}
+              pageType={pageType}
+              startingSlot={startingSlot}
+              isDragDisabled={isPending || isMoving}
+              {...props}
+            />
+          );
+        })}
+      </div>
+
+      {/* Loading overlay for when moving cards (only if not controlled by parent) */}
+      {!isControlledByParent && isMoving && (
+        <div className="absolute inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-xl">
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Moving card...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // If controlled by parent, just return the grid content
+  if (isControlledByParent) {
+    return <GridContent />;
+  }
+
+  // If not controlled by parent, wrap with own DndContext (backward compatibility)
   return (
     <DndContext
       sensors={sensors}
@@ -203,58 +276,9 @@ const BinderGrid = ({
       onDragEnd={handleDragEnd}
       disabled={!isDragEnabled || isMoving}
     >
-      <div className="flex flex-col items-center justify-center h-full p-2">
-        {/* Grid container */}
-        <div
-          className="grid group"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, 1fr)`,
-            gridTemplateRows: `repeat(${rows}, 1fr)`,
-            width: `${gridDimensions.gridWidth}px`,
-            height: `${gridDimensions.gridHeight}px`,
-            gap: `${gridDimensions.gap}px`,
-            maxWidth: "95vw",
-            maxHeight: "95vh",
-          }}
-        >
-          {gridSlots.map((slot) => {
-            const savedCard = getSavedCardForSlot(slot);
-            const isPending = isCardPending(savedCard);
+      <GridContent />
 
-            return (
-              <DraggableCardSlot
-                key={slot}
-                slot={slot}
-                cardWidth={gridDimensions.cardWidth}
-                cardHeight={gridDimensions.cardHeight}
-                onAddCard={onAddCard}
-                savedCard={savedCard}
-                gridSize={gridSize}
-                pageType={pageType}
-                startingSlot={startingSlot}
-                isDragDisabled={isPending || isMoving}
-                {...props}
-              />
-            );
-          })}
-        </div>
-
-        {/* Loading overlay for when moving cards */}
-        {isMoving && (
-          <div className="absolute inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-xl">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Moving card...
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Drag overlay */}
+      {/* Drag overlay (only if not controlled by parent) */}
       <DragOverlay>
         {activeCard ? (
           <div

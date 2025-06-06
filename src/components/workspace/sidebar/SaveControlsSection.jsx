@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Save, RotateCcw, Circle, Plus, Minus, Edit3 } from "lucide-react";
+import { Save, RotateCcw, Circle, Edit3 } from "lucide-react";
 import { Button } from "../../ui";
 import { useAnimations } from "../../../contexts/AnimationContext";
-import { usePendingChanges } from "../../../hooks/usePendingChanges";
+import { useBinderSync } from "../../../hooks/useBinder.Sync";
 
 /**
  * SaveControlsSection - Bottom action bar for save/revert controls
@@ -17,17 +17,12 @@ const SaveControlsSection = ({
 }) => {
   const { getTransition } = useAnimations();
 
-  // Get pending card changes
-  const {
-    summary: cardSummary,
-    hasChanges: hasPendingCards,
-    isSyncing,
-    syncToFirebase,
-    clearAllPending,
-  } = usePendingChanges(binderId);
+  // Get sync status for binder
+  const { isSyncing, hasUnsyncedChanges, syncToFirebase, revertToFirebase } =
+    useBinderSync(binderId);
 
   // Determine if we have any changes at all
-  const hasAnyChanges = isDirty || hasPendingCards;
+  const hasAnyChanges = isDirty || hasUnsyncedChanges;
   const isAnySaving = isSaving || isSyncing;
 
   // Handle unified save that saves both preferences and pending cards
@@ -37,27 +32,34 @@ const SaveControlsSection = ({
       await onSave();
     }
 
-    // Then sync pending cards if there are any
-    if (hasPendingCards) {
+    // Then sync local binder state if there are any changes
+    if (hasUnsyncedChanges) {
       await syncToFirebase();
     }
   };
 
   // Handle unified revert that reverts both preferences and pending cards
-  const handleUnifiedRevert = () => {
+  const handleUnifiedRevert = async () => {
+    console.log("Reverting all changes...");
+
     // Revert preferences if there are any
     if (isDirty && onRevert) {
       onRevert();
     }
 
-    // Clear pending cards if there are any
-    if (hasPendingCards) {
-      clearAllPending();
+    // Revert local binder state changes to Firebase state
+    if (hasUnsyncedChanges && revertToFirebase) {
+      const result = await revertToFirebase();
+      if (result.success) {
+        console.log("Successfully reverted binder changes");
+      } else {
+        console.error("Failed to revert binder changes:", result.error);
+      }
     }
   };
 
   // Calculate total changes for display
-  const totalChanges = (isDirty ? 1 : 0) + cardSummary.totalChanges;
+  const totalChanges = (isDirty ? 1 : 0) + (hasUnsyncedChanges ? 1 : 0);
 
   return (
     <AnimatePresence>
@@ -82,7 +84,7 @@ const SaveControlsSection = ({
           </div>
 
           {/* Changes Summary */}
-          {(isDirty || hasPendingCards) && (
+          {hasAnyChanges && (
             <div className="mb-3 space-y-1">
               {isDirty && (
                 <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400">
@@ -90,40 +92,10 @@ const SaveControlsSection = ({
                   <span>Binder preferences modified</span>
                 </div>
               )}
-              {cardSummary.addedCards > 0 && (
-                <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400">
-                  <Plus className="w-3 h-3" />
-                  <span>
-                    {cardSummary.addedCards} card
-                    {cardSummary.addedCards !== 1 ? "s" : ""} to add
-                  </span>
-                </div>
-              )}
-              {cardSummary.removedCards > 0 && (
-                <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400">
-                  <Minus className="w-3 h-3" />
-                  <span>
-                    {cardSummary.removedCards} card
-                    {cardSummary.removedCards !== 1 ? "s" : ""} to remove
-                  </span>
-                </div>
-              )}
-              {cardSummary.updatedCards > 0 && (
+              {hasUnsyncedChanges && (
                 <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400">
                   <Edit3 className="w-3 h-3" />
-                  <span>
-                    {cardSummary.updatedCards} card
-                    {cardSummary.updatedCards !== 1 ? "s" : ""} to update
-                  </span>
-                </div>
-              )}
-              {cardSummary.movedCards > 0 && (
-                <div className="flex items-center space-x-2 text-xs text-gray-600 dark:text-gray-400">
-                  <Edit3 className="w-3 h-3" />
-                  <span>
-                    {cardSummary.movedCards} card
-                    {cardSummary.movedCards !== 1 ? "s" : ""} moved
-                  </span>
+                  <span>Binder state changes</span>
                 </div>
               )}
             </div>

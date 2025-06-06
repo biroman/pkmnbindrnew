@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import BinderGrid from "./BinderGrid";
 import { parseGridSize } from "../../utils/gridUtils";
 import {
@@ -16,6 +16,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../ui";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from "@dnd-kit/core";
+import BinderCardSlot from "./BinderCardSlot";
+import {
+  parseDragId,
+  validateCardMove,
+  moveCardToSlot,
+  swapCards,
+} from "../../utils/cardMovement";
 
 /**
  * BinderSpread - Two-page spread component that mimics a real binder
@@ -73,6 +89,146 @@ const BinderSpread = ({
   const holdTimerRef = useRef(null);
   const progressIntervalRef = useRef(null);
 
+  // Cross-page drag and drop state
+  const [activeId, setActiveId] = useState(null);
+  const [isMoving, setIsMoving] = useState(false);
+
+  // Set up sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required to start drag
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
+
+  // Get card being dragged for overlay
+  const getActiveCard = useCallback(() => {
+    if (!activeId) return null;
+    const dragInfo = parseDragId(activeId);
+    if (dragInfo.type === "card") {
+      return allCards.find((card) => card.id === dragInfo.cardId);
+    }
+    return null;
+  }, [activeId, allCards]);
+
+  // Handle drag start
+  const handleDragStart = useCallback((event) => {
+    setActiveId(event.active.id);
+  }, []);
+
+  // Handle drag end with cross-page support
+  const handleDragEnd = useCallback(
+    (event) => {
+      const { active, over } = event;
+
+      setActiveId(null);
+
+      if (!over || !active || active.id === over.id) {
+        return; // No valid drop or dropped on same slot
+      }
+
+      const sourceInfo = parseDragId(active.id);
+      const targetInfo = {
+        slot: over.data.current.slot,
+        type: over.data.current.type,
+        cardId: over.data.current.cardId,
+      };
+
+      // Get fresh card data right before validation to include newly added cards
+      const freshCards = allCards.length > 0 ? allCards : [];
+
+      // Also try to get cards from saved cards if allCards is stale
+      const combinedCards = [...freshCards];
+      [...cardsOnPage1, ...cardsOnPage2].forEach((card) => {
+        if (!combinedCards.find((c) => c.id === card.id)) {
+          combinedCards.push(card);
+        }
+      });
+
+      // Validate the move with the most up-to-date card data
+      const validation = validateCardMove(
+        sourceInfo,
+        targetInfo,
+        combinedCards,
+        props.binderId
+      );
+
+      if (!validation.isValid) {
+        console.warn("Invalid cross-page move:", validation.reason);
+        console.log(
+          "Available cards for validation:",
+          combinedCards.map((c) => c.id)
+        );
+        console.log("Looking for card ID:", sourceInfo.cardId);
+        return;
+      }
+
+      setIsMoving(true);
+
+      try {
+        let result;
+
+        if (validation.action === "move") {
+          // Move card to empty slot
+          result = moveCardToSlot(
+            props.binderId,
+            validation.sourceCard,
+            targetInfo.slot,
+            gridSize
+          );
+        } else if (validation.action === "swap") {
+          // Swap cards
+          result = swapCards(
+            props.binderId,
+            validation.sourceCard,
+            validation.targetCard,
+            sourceInfo.slot,
+            targetInfo.slot,
+            gridSize
+          );
+        }
+
+        if (result?.success) {
+          console.log("Cross-page card move successful:", result);
+
+          // Force immediate UI update by dispatching custom event
+          window.dispatchEvent(
+            new CustomEvent("localBinderUpdate", {
+              detail: { binderId: props.binderId, type: "cardMove", result },
+            })
+          );
+
+          // Call the callback to trigger save button
+          if (onCardMove) {
+            onCardMove(result);
+          }
+        } else {
+          console.error("Cross-page card move failed:", result?.error);
+        }
+      } catch (error) {
+        console.error("Error during cross-page card move:", error);
+      } finally {
+        setIsMoving(false);
+      }
+    },
+    [allCards, cardsOnPage1, cardsOnPage2, gridSize, onCardMove, props.binderId]
+  );
+
+  // Calculate binding height based on grid + padding to match page content exactly
+  const getBindingHeight = () => {
+    // Use measured page height if available, otherwise calculate from grid dimensions
+    if (pageHeight) {
+      return pageHeight;
+    }
+
+    // Calculate height to match BinderGrid container:
+    // - Grid height + padding (p-2 = 8px top + 8px bottom = 16px total)
+    // - Add some extra space for visual balance
+    return gridDimensions.gridHeight + 32; // 16px padding + 16px extra space
+  };
+
   // Calculate the actual page height for binding
   useEffect(() => {
     if (leftPageRef.current) {
@@ -100,224 +256,236 @@ const BinderSpread = ({
     };
   }, []);
 
-  // Hold-to-delete functions
   const startHoldToDelete = () => {
-    console.log("Starting hold to delete for page:", currentPage);
+    if (isHolding) return;
+
     setIsHolding(true);
     setHoldProgress(0);
 
-    // Progress animation (update every 50ms for smooth animation)
+    holdTimerRef.current = setTimeout(() => {
+      onDeletePage(currentPage);
+      setIsHolding(false);
+      setHoldProgress(0);
+    }, 2000);
+
     progressIntervalRef.current = setInterval(() => {
       setHoldProgress((prev) => {
-        const newProgress = prev + (50 / 1000) * 100; // 50ms steps over 1000ms = 5% per step
-        return Math.min(newProgress, 100);
+        const newProgress = prev + 2; // 2% per 40ms = 100% in 2 seconds
+        return newProgress >= 100 ? 100 : newProgress;
       });
-    }, 50);
-
-    // Delete after 1 second
-    holdTimerRef.current = setTimeout(() => {
-      console.log("Hold complete, deleting page:", currentPage);
-      if (onDeletePage) {
-        onDeletePage(currentPage);
-      }
-      cancelHoldToDelete();
-    }, 1000);
+    }, 40);
   };
 
   const cancelHoldToDelete = () => {
-    console.log("Canceling hold to delete");
-    setIsHolding(false);
-    setHoldProgress(0);
-
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
     }
+    setIsHolding(false);
+    setHoldProgress(0);
   };
 
-  // Calculate page layout based on page structure
   const getPageLayout = (page) => {
     if (page === 1) {
-      // Page 1: Empty cover (left) + Page 1 content (right)
+      // Page 1: Empty cover on left, page 1 content on right
       return {
-        showCoverPage: true,
-        leftSide: { type: "cover", isEmpty: true, pageNumber: 0 },
+        leftSide: {
+          isEmpty: true,
+          pageNumber: null,
+          startingSlot: null,
+        },
         rightSide: {
-          type: "content",
           isEmpty: false,
           pageNumber: 1,
           startingSlot: 1,
         },
+        showCoverPage: true,
       };
     } else {
-      // Page 2+: Normal spreads with content on both sides
-      const slotsPerPage = totalSlots;
-      const leftPageNumber = (page - 2) * 2 + 2; // Pages 2, 4, 6, 8...
-      const rightPageNumber = leftPageNumber + 1; // Pages 3, 5, 7, 9...
-      const baseSlotOffset = slotsPerPage; // Skip the first page's slots
+      // Other pages: left page (even-1), right page (even)
+      const leftPageNumber = (page - 1) * 2;
+      const rightPageNumber = leftPageNumber + 1;
 
       return {
-        showCoverPage: false,
         leftSide: {
-          type: "content",
           isEmpty: false,
           pageNumber: leftPageNumber,
-          startingSlot:
-            baseSlotOffset + (leftPageNumber - 2) * slotsPerPage + 1,
+          startingSlot: (leftPageNumber - 1) * totalSlots + 1,
         },
         rightSide: {
-          type: "content",
           isEmpty: false,
           pageNumber: rightPageNumber,
-          startingSlot:
-            baseSlotOffset + (rightPageNumber - 2) * slotsPerPage + 1,
+          startingSlot: (rightPageNumber - 1) * totalSlots + 1,
         },
+        showCoverPage: false,
       };
     }
   };
 
   const pageLayout = getPageLayout(currentPage);
-
-  // Calculate binding height based on grid + padding to match page content exactly
-  const getBindingHeight = () => {
-    // Use measured page height if available, otherwise calculate from grid dimensions
-    if (pageHeight) {
-      return pageHeight;
-    }
-
-    // Calculate height to match BinderGrid container:
-    // - Grid height + padding (p-2 = 8px top + 8px bottom = 16px total)
-    // - Add some extra space for visual balance
-    return gridDimensions.gridHeight + 32; // 16px padding + 16px extra space
-  };
-
   const bindingHeight = getBindingHeight();
 
+  // Get active card for overlay
+  const activeCard = getActiveCard();
+
+  // Mobile view with single page
   if (gridDimensions.isMobile) {
-    // Mobile: Show only one side at a time
-    const showPageSelector =
-      !pageLayout.showCoverPage || !pageLayout.leftSide.isEmpty;
+    // Determine which side to show
     const currentSide =
       mobilePage === "left" ? pageLayout.leftSide : pageLayout.rightSide;
 
     return (
-      <div className="flex-1 h-full overflow-hidden">
-        <div className="h-full flex flex-col">
-          {/* Mobile Page Navigation */}
-          {showPageSelector && (
-            <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setMobilePage("left")}
-                disabled={mobilePage === "left" || pageLayout.leftSide.isEmpty}
-                className="flex items-center space-x-1"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span className="text-xs">
-                  {pageLayout.leftSide.isEmpty
-                    ? "Cover"
-                    : `Page ${pageLayout.leftSide.pageNumber}`}
-                </span>
-              </Button>
-
-              <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-                {currentSide.isEmpty
-                  ? "Cover Page"
-                  : `Page ${currentSide.pageNumber}`}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        disabled={!isDragEnabled || isMoving}
+      >
+        <div className="flex-1 h-full overflow-hidden">
+          <div className="h-full flex flex-col items-center justify-center p-4">
+            {/* Mobile Page Toggle */}
+            {currentPage !== 1 && (
+              <div className="flex items-center space-x-2 mb-4">
+                <Button
+                  variant={mobilePage === "left" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMobilePage("left")}
+                  className="text-xs"
+                >
+                  Left
+                </Button>
+                <Button
+                  variant={mobilePage === "right" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMobilePage("right")}
+                  className="text-xs"
+                >
+                  Right
+                </Button>
               </div>
+            )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setMobilePage("right")}
-                disabled={mobilePage === "right"}
-                className="flex items-center space-x-1"
-              >
-                <span className="text-xs">
-                  Page {pageLayout.rightSide.pageNumber}
-                </span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            {/* Single Page Content */}
+            <div className="flex-1 min-h-0 bg-white dark:bg-gray-800">
+              {currentSide.isEmpty ? (
+                <CoverPageContent gridDimensions={gridDimensions} />
+              ) : (
+                <BinderGrid
+                  gridDimensions={gridDimensions}
+                  gridSize={gridSize}
+                  startingSlot={currentSide.startingSlot}
+                  onAddCard={onAddCard}
+                  pageType={mobilePage}
+                  savedCards={
+                    mobilePage === "left" ? cardsOnPage1 : cardsOnPage2
+                  }
+                  allCards={allCards}
+                  onCardMove={onCardMove}
+                  isDragEnabled={isDragEnabled && !isMoving}
+                  isControlledByParent={true}
+                  {...props}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Loading overlay for mobile */}
+          {isMoving && (
+            <div className="absolute inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-xl">
+                <div className="flex items-center space-x-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Moving card...
+                  </span>
+                </div>
+              </div>
             </div>
           )}
+        </div>
 
-          {/* Single Page Content */}
-          <div className="flex-1 min-h-0 bg-white dark:bg-gray-800">
-            {currentSide.isEmpty ? (
-              <CoverPageContent gridDimensions={gridDimensions} />
-            ) : (
-              <BinderGrid
-                gridDimensions={gridDimensions}
+        {/* Drag overlay for mobile */}
+        <DragOverlay>
+          {activeCard ? (
+            <div
+              className="transform rotate-6 scale-110 shadow-2xl"
+              style={{
+                width: `${gridDimensions.cardWidth}px`,
+                height: `${gridDimensions.cardHeight}px`,
+              }}
+            >
+              <BinderCardSlot
+                slot={0} // Dummy slot for overlay
+                cardWidth={gridDimensions.cardWidth}
+                cardHeight={gridDimensions.cardHeight}
+                savedCard={activeCard}
                 gridSize={gridSize}
-                startingSlot={currentSide.startingSlot}
-                onAddCard={onAddCard}
-                pageType={mobilePage}
-                savedCards={mobilePage === "left" ? cardsOnPage1 : cardsOnPage2}
+                pageType="overlay"
+                startingSlot={1}
+                onAddCard={() => {}} // No-op for overlay
                 {...props}
               />
-            )}
-          </div>
-        </div>
-      </div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     );
   }
 
-  // Desktop: Show both sides
+  // Desktop: Show both sides with cross-page dragging
   return (
-    <div className="flex-1 h-full overflow-hidden">
-      <div className="h-full flex items-center justify-center p-4">
-        <div
-          className="relative flex items-center"
-          style={{ width: `${gridDimensions.totalWidth}px` }}
-        >
-          {/* Page Navigation - Left */}
-          {onPreviousPage && (
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={onPreviousPage}
-              disabled={!canGoPrevious}
-              className="absolute -left-16 top-1/2 transform -translate-y-1/2 h-12 w-12 p-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-full shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:scale-110 disabled:hover:scale-100 transition-all duration-200 disabled:opacity-50 z-10"
-              title="Previous Page"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </Button>
-          )}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      disabled={!isDragEnabled || isMoving}
+    >
+      <div className="flex-1 h-full overflow-hidden">
+        <div className="h-full flex items-center justify-center p-4">
+          <div
+            className="relative flex items-center"
+            style={{ width: `${gridDimensions.totalWidth}px` }}
+          >
+            {/* Page Navigation - Left */}
+            {onPreviousPage && (
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={onPreviousPage}
+                disabled={!canGoPrevious}
+                className="absolute -left-16 top-1/2 transform -translate-y-1/2 h-12 w-12 p-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-full shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:scale-110 disabled:hover:scale-100 transition-all duration-200 disabled:opacity-50 z-10"
+                title="Previous Page"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </Button>
+            )}
 
-          {/* Page Navigation - Right */}
-          {(onNextPage || onAddPage) && (
-            <div className="absolute -right-16 top-1/2 transform -translate-y-1/2 z-50">
+            {/* Page Navigation - Right */}
+            {onNextPage && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant={currentPage >= totalPages ? "default" : "ghost"}
+                      variant="ghost"
                       size="lg"
                       onClick={
                         currentPage >= totalPages ? onAddPage : onNextPage
                       }
                       disabled={
-                        currentPage >= totalPages ? isAtPageLimit : !canGoNext
+                        (!canGoNext && currentPage < totalPages) ||
+                        (currentPage >= totalPages && isAtPageLimit)
                       }
-                      className={`h-12 w-12 p-0 backdrop-blur-xl rounded-full shadow-lg border transition-all duration-200 ${
-                        currentPage >= totalPages
-                          ? isAtPageLimit
-                            ? "!bg-gray-400 !text-gray-600 !border-gray-300 cursor-not-allowed" // Disabled state
-                            : "!bg-blue-500 hover:!bg-blue-600 dark:!bg-blue-500 dark:hover:!bg-blue-600 !text-white !border-blue-400 dark:!border-blue-400 hover:scale-110" // Active state
-                          : !canGoNext
-                          ? "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 disabled:opacity-50 disabled:hover:scale-100"
-                          : "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 hover:scale-110"
-                      }`}
+                      className="absolute -right-16 top-1/2 transform -translate-y-1/2 h-12 w-12 p-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-full shadow-lg border border-gray-200/50 dark:border-gray-700/50 hover:scale-110 disabled:hover:scale-100 transition-all duration-200 disabled:opacity-50 z-10"
                       title={
                         currentPage >= totalPages
                           ? isAtPageLimit
-                            ? `Page limit reached (${totalPages}/${maxPages})`
+                            ? "Page limit reached"
                             : "Add New Page"
                           : "Next Page"
                       }
@@ -362,133 +530,174 @@ const BinderSpread = ({
                   )}
                 </Tooltip>
               </TooltipProvider>
-            </div>
-          )}
+            )}
 
-          {/* Delete Page Button */}
-          {onDeletePage && totalPages > 1 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onMouseDown={startHoldToDelete}
-              onMouseUp={cancelHoldToDelete}
-              onMouseLeave={cancelHoldToDelete}
-              onTouchStart={startHoldToDelete}
-              onTouchEnd={cancelHoldToDelete}
-              className={`absolute -right-14 top-1/2 mt-8 h-8 w-8 p-0 backdrop-blur-xl rounded-full shadow-md border transition-all duration-200 hover:scale-110 z-10 ${
-                isHolding
-                  ? "bg-red-500 hover:bg-red-600 text-white border-red-400"
-                  : "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:border-red-200 dark:hover:border-red-800"
-              }`}
-              title={`Hold to Delete Page ${currentPage}`}
+            {/* Delete Page Button */}
+            {onDeletePage && totalPages > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onMouseDown={startHoldToDelete}
+                onMouseUp={cancelHoldToDelete}
+                onMouseLeave={cancelHoldToDelete}
+                onTouchStart={startHoldToDelete}
+                onTouchEnd={cancelHoldToDelete}
+                className={`absolute -right-14 top-1/2 mt-8 h-8 w-8 p-0 backdrop-blur-xl rounded-full shadow-md border transition-all duration-200 hover:scale-110 z-10 ${
+                  isHolding
+                    ? "bg-red-500 hover:bg-red-600 text-white border-red-400"
+                    : "bg-white/90 dark:bg-gray-800/90 border-gray-200/50 dark:border-gray-700/50 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:border-red-200 dark:hover:border-red-800"
+                }`}
+                title={`Hold to Delete Page ${currentPage}`}
+              >
+                {/* Progress Ring */}
+                {isHolding && (
+                  <div className="absolute inset-0 rounded-full">
+                    <svg
+                      className="w-full h-full transform -rotate-90"
+                      viewBox="0 0 32 32"
+                    >
+                      <circle
+                        cx="16"
+                        cy="16"
+                        r="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeOpacity="0.3"
+                      />
+                      <circle
+                        cx="16"
+                        cy="16"
+                        r="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeDasharray={`${2 * Math.PI * 14}`}
+                        strokeDashoffset={`${
+                          2 * Math.PI * 14 * (1 - holdProgress / 100)
+                        }`}
+                        className="transition-all duration-75 ease-linear"
+                      />
+                    </svg>
+                  </div>
+                )}
+                <Trash2 className="h-4 w-4 relative z-10" />
+              </Button>
+            )}
+
+            {/* Left Side */}
+            <div
+              ref={leftPageRef}
+              className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-l-lg shadow-lg border border-gray-200 dark:border-gray-700"
+              style={{ width: `${gridDimensions.pageWidth}px` }}
             >
-              {/* Progress Ring */}
-              {isHolding && (
-                <div className="absolute inset-0 rounded-full">
-                  <svg
-                    className="w-full h-full transform -rotate-90"
-                    viewBox="0 0 32 32"
-                  >
-                    <circle
-                      cx="16"
-                      cy="16"
-                      r="14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeOpacity="0.3"
-                    />
-                    <circle
-                      cx="16"
-                      cy="16"
-                      r="14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeDasharray={`${2 * Math.PI * 14}`}
-                      strokeDashoffset={`${
-                        2 * Math.PI * 14 * (1 - holdProgress / 100)
-                      }`}
-                      className="transition-all duration-75 ease-linear"
-                    />
-                  </svg>
-                </div>
+              {pageLayout.leftSide.isEmpty ? (
+                <CoverPageContent gridDimensions={gridDimensions} />
+              ) : (
+                <BinderGrid
+                  gridDimensions={gridDimensions}
+                  gridSize={gridSize}
+                  startingSlot={pageLayout.leftSide.startingSlot}
+                  onAddCard={onAddCard}
+                  pageType="left"
+                  savedCards={cardsOnPage1}
+                  allCards={allCards}
+                  onCardMove={onCardMove}
+                  isDragEnabled={isDragEnabled && !isMoving}
+                  isControlledByParent={true}
+                  {...props}
+                />
               )}
-              <Trash2 className="h-4 w-4 relative z-10" />
-            </Button>
-          )}
+            </div>
 
-          {/* Left Side */}
-          <div
-            ref={leftPageRef}
-            className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-l-lg shadow-lg border border-gray-200 dark:border-gray-700"
-            style={{ width: `${gridDimensions.pageWidth}px` }}
-          >
-            {pageLayout.leftSide.isEmpty ? (
-              <CoverPageContent gridDimensions={gridDimensions} />
-            ) : (
-              <BinderGrid
-                gridDimensions={gridDimensions}
-                gridSize={gridSize}
-                startingSlot={pageLayout.leftSide.startingSlot}
-                onAddCard={onAddCard}
-                pageType="left"
-                savedCards={cardsOnPage1}
-                allCards={allCards}
-                onCardMove={onCardMove}
-                isDragEnabled={isDragEnabled}
-                {...props}
-              />
-            )}
-          </div>
+            {/* Binding (center spine) */}
+            <div
+              className="flex-shrink-0 bg-gray-200 dark:bg-gray-900 border-y border-gray-300 dark:border-gray-600 relative"
+              style={{
+                width: `${gridDimensions.bindingWidth}px`,
+                height: `${bindingHeight}px`,
+              }}
+            >
+              {/* Binding rings/holes - scale count based on height */}
+              <div className="absolute inset-0 flex flex-col justify-evenly items-center py-4">
+                {Array.from(
+                  { length: Math.max(3, Math.floor(bindingHeight / 100)) },
+                  (_, i) => (
+                    <div
+                      key={i}
+                      className="w-3 h-3 rounded-full bg-gray-400 dark:bg-gray-500 border border-gray-500 dark:border-gray-400"
+                    />
+                  )
+                )}
+              </div>
+            </div>
 
-          {/* Binding (center spine) */}
-          <div
-            className="flex-shrink-0 bg-gray-200 dark:bg-gray-900 border-y border-gray-300 dark:border-gray-600 relative"
-            style={{
-              width: `${gridDimensions.bindingWidth}px`,
-              height: `${bindingHeight}px`,
-            }}
-          >
-            {/* Binding rings/holes - scale count based on height */}
-            <div className="absolute inset-0 flex flex-col justify-evenly items-center py-4">
-              {Array.from(
-                { length: Math.max(3, Math.floor(bindingHeight / 100)) },
-                (_, i) => (
-                  <div
-                    key={i}
-                    className="w-3 h-3 rounded-full bg-gray-400 dark:bg-gray-500 border border-gray-500 dark:border-gray-400"
-                  />
-                )
+            {/* Right Side */}
+            <div
+              className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-r-lg shadow-lg border border-gray-200 dark:border-gray-700"
+              style={{ width: `${gridDimensions.pageWidth}px` }}
+            >
+              {pageLayout.rightSide.isEmpty ? (
+                <CoverPageContent gridDimensions={gridDimensions} />
+              ) : (
+                <BinderGrid
+                  gridDimensions={gridDimensions}
+                  gridSize={gridSize}
+                  startingSlot={pageLayout.rightSide.startingSlot}
+                  onAddCard={onAddCard}
+                  pageType="right"
+                  savedCards={currentPage === 1 ? cardsOnPage1 : cardsOnPage2}
+                  allCards={allCards}
+                  onCardMove={onCardMove}
+                  isDragEnabled={isDragEnabled && !isMoving}
+                  isControlledByParent={true}
+                  {...props}
+                />
               )}
             </div>
           </div>
 
-          {/* Right Side */}
-          <div
-            className="flex-shrink-0 bg-white dark:bg-gray-800 rounded-r-lg shadow-lg border border-gray-200 dark:border-gray-700"
-            style={{ width: `${gridDimensions.pageWidth}px` }}
-          >
-            {pageLayout.rightSide.isEmpty ? (
-              <CoverPageContent gridDimensions={gridDimensions} />
-            ) : (
-              <BinderGrid
-                gridDimensions={gridDimensions}
+          {/* Loading overlay for desktop */}
+          {isMoving && (
+            <div className="absolute inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-xl">
+                <div className="flex items-center space-x-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Moving card...
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Drag overlay for desktop */}
+        <DragOverlay>
+          {activeCard ? (
+            <div
+              className="transform rotate-6 scale-110 shadow-2xl"
+              style={{
+                width: `${gridDimensions.cardWidth}px`,
+                height: `${gridDimensions.cardHeight}px`,
+              }}
+            >
+              <BinderCardSlot
+                slot={0} // Dummy slot for overlay
+                cardWidth={gridDimensions.cardWidth}
+                cardHeight={gridDimensions.cardHeight}
+                savedCard={activeCard}
                 gridSize={gridSize}
-                startingSlot={pageLayout.rightSide.startingSlot}
-                onAddCard={onAddCard}
-                pageType="right"
-                savedCards={currentPage === 1 ? cardsOnPage1 : cardsOnPage2}
-                allCards={allCards}
-                onCardMove={onCardMove}
-                isDragEnabled={isDragEnabled}
+                pageType="overlay"
+                startingSlot={1}
+                onAddCard={() => {}} // No-op for overlay
                 {...props}
               />
-            )}
-          </div>
-        </div>
+            </div>
+          ) : null}
+        </DragOverlay>
       </div>
-    </div>
+    </DndContext>
   );
 };
 

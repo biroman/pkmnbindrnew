@@ -4,7 +4,7 @@ import { X, Search, Package, Plus, Check } from "lucide-react";
 import { Button } from "../ui";
 import CardSearchTab from "./CardSearchTab";
 import SetBrowseTab from "./SetBrowseTab";
-import { addCardsToPending } from "../../utils/localBinderStorage";
+import { addCardsToLocalBinder } from "../../utils/localBinderStorage";
 import { getNextAvailableSlots } from "../../utils/slotAssignment";
 import { SlotLimitModal } from "../modals";
 
@@ -29,7 +29,21 @@ const AddCardsModal = ({
   const [slotLimitData, setSlotLimitData] = useState(null);
 
   const handleAddSelectedCards = async () => {
-    if (selectedCards.length === 0 || !binderId) return;
+    if (selectedCards.length === 0 || !binderId) {
+      console.log("Cannot add cards:", {
+        selectedCardsLength: selectedCards.length,
+        binderId,
+      });
+      return;
+    }
+
+    console.log("Adding cards to binder:", {
+      selectedCards: selectedCards.length,
+      binderId,
+      currentPage,
+      gridSize,
+      totalPages,
+    });
 
     setIsAddingToBinder(true);
 
@@ -58,28 +72,57 @@ const AddCardsModal = ({
         return;
       }
 
-      // Assign slots to cards
-      const cardsWithSlots = selectedCards.map((card, index) => ({
-        ...card,
-        assignedSlot: availableSlots[index],
-      }));
+      // Assign slots to cards and format them correctly
+      const cardsWithSlots = selectedCards.map((card, index) => {
+        const slot = availableSlots[index];
+        return {
+          // Generate a unique ID for the card entry
+          id:
+            card._tempSelectionId ||
+            `${card.id}_${Date.now()}_${Math.random()
+              .toString(36)
+              .substr(2, 9)}`,
+
+          // Card data
+          cardData: card,
+
+          // Slot position
+          pageNumber: slot.pageNumber,
+          slotInPage: slot.slotInPage,
+          overallSlotNumber: slot.overallSlotNumber,
+
+          // Additional metadata
+          dateAdded: new Date().toISOString(),
+        };
+      });
 
       console.log("Cards with assigned slots:", cardsWithSlots);
 
       // Add cards to local storage with slot assignments
-      const result = addCardsToPending(binderId, cardsWithSlots);
+      const result = addCardsToLocalBinder(binderId, cardsWithSlots);
+      console.log("Add cards result:", result);
 
       if (result.success) {
+        // IMPORTANT: Dispatch the event to notify other components to refresh
+        window.dispatchEvent(
+          new CustomEvent("localBinderUpdate", {
+            detail: {
+              binderId,
+              type: "cardsAdded",
+              addedCount: result.addedCount || cardsWithSlots.length,
+            },
+          })
+        );
+
         // Clear selection and close modal
         setSelectedCards([]);
 
         // Notify parent component about the local additions
         if (onCardsAddedLocally) {
           onCardsAddedLocally({
-            addedCount: result.addedCount,
-            duplicatesSkipped: result.duplicatesSkipped,
+            addedCount: result.addedCount || cardsWithSlots.length,
             totalSelected: selectedCards.length,
-            slotsAssigned: availableSlots.slice(0, result.addedCount),
+            slotsAssigned: availableSlots.slice(0, cardsWithSlots.length),
           });
         }
 

@@ -1,5 +1,5 @@
 import { parseGridSize } from "./gridUtils";
-import { getPendingCardAdditions } from "./localBinderStorage";
+import { getAllLocalCards } from "./localBinderStorage";
 
 /**
  * Utility functions for managing card slot assignments in binders
@@ -24,20 +24,22 @@ export const getNextAvailableSlots = (
   totalPages = 1
 ) => {
   const { totalSlots: slotsPerPage } = parseGridSize(gridSize);
-  const pendingCards = getPendingCardAdditions(binderId);
+
+  // Get all local cards (this includes both saved and pending cards in the new system)
+  const localCards = getAllLocalCards(binderId);
 
   // Create a set of occupied slots for fast lookup
   const occupiedSlots = new Set();
 
-  // Mark saved card slots as occupied
+  // Mark saved card slots as occupied (from Firebase)
   savedCards.forEach((card) => {
     if (card.pageNumber && card.slotInPage) {
       occupiedSlots.add(`${card.pageNumber}-${card.slotInPage}`);
     }
   });
 
-  // Mark pending card slots as occupied
-  pendingCards.forEach((card) => {
+  // Mark local card slots as occupied (from local storage)
+  localCards.forEach((card) => {
     if (card.pageNumber && card.slotInPage) {
       occupiedSlots.add(`${card.pageNumber}-${card.slotInPage}`);
     }
@@ -105,29 +107,30 @@ export const getSlotNumberFromPageAndSlot = (
  * Check if a specific slot is available
  * @param {number} pageNumber - Page number
  * @param {number} slotInPage - Slot in page
- * @param {Array} savedCards - Saved cards
- * @param {Array} pendingCards - Pending cards
+ * @param {string} binderId - Binder ID
+ * @param {Array} savedCards - Saved cards (optional, for backwards compatibility)
  * @returns {boolean} True if slot is available
  */
 export const isSlotAvailable = (
   pageNumber,
   slotInPage,
-  savedCards = [],
-  pendingCards = []
+  binderId,
+  savedCards = []
 ) => {
-  const slotKey = `${pageNumber}-${slotInPage}`;
+  // Get all local cards from the new system
+  const localCards = getAllLocalCards(binderId);
 
-  // Check saved cards
+  // Check saved cards (from Firebase)
   const hasSavedCard = savedCards.some(
     (card) => card.pageNumber === pageNumber && card.slotInPage === slotInPage
   );
 
-  // Check pending cards
-  const hasPendingCard = pendingCards.some(
+  // Check local cards (from local storage)
+  const hasLocalCard = localCards.some(
     (card) => card.pageNumber === pageNumber && card.slotInPage === slotInPage
   );
 
-  return !hasSavedCard && !hasPendingCard;
+  return !hasSavedCard && !hasLocalCard;
 };
 
 /**

@@ -1,5 +1,4 @@
-import { Plus, Clock } from "lucide-react";
-import { usePendingChanges } from "../../hooks/usePendingChanges";
+import { Plus } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useParams } from "react-router-dom";
 import { getPageAndSlotFromSlotNumber } from "../../utils/slotAssignment";
@@ -27,7 +26,6 @@ const BinderCardSlot = ({
 }) => {
   const { binderId } = useParams();
   const { currentUser } = useAuth();
-  const { pendingCards } = usePendingChanges(binderId);
 
   // Calculate the actual page and slot position from the slot number
   const { pageNumber, slotInPage } = getPageAndSlotFromSlotNumber(
@@ -35,14 +33,8 @@ const BinderCardSlot = ({
     gridSize
   );
 
-  // Find pending card for this specific page and slot position
-  const pendingCard =
-    pendingCards?.find(
-      (card) => card.pageNumber === pageNumber && card.slotInPage === slotInPage
-    ) || null;
-
-  // Determine which card to display (saved card takes precedence over pending)
-  const displayCard = savedCard || pendingCard;
+  // In the new system, only savedCard exists (from local storage)
+  const displayCard = savedCard;
 
   const handleClick = () => {
     if (onAddCard && !displayCard) {
@@ -60,15 +52,10 @@ const BinderCardSlot = ({
   // If there's a card to display
   if (displayCard) {
     const cardData = displayCard.cardData || displayCard;
-    const isPending = !savedCard && pendingCard;
 
     return (
       <div
-        className={`relative rounded-lg border-2 transition-all duration-200 ${
-          isPending
-            ? "border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20"
-            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-        }`}
+        className="relative rounded-lg border-2 transition-all duration-200 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
         style={{
           width: `${cardWidth}px`,
           height: `${cardHeight}px`,
@@ -103,12 +90,7 @@ const BinderCardSlot = ({
           </span>
         </div>
 
-        {/* Pending indicator */}
-        {isPending && (
-          <div className="absolute top-1 right-1 bg-yellow-500 text-white rounded-full p-1">
-            <Clock className="h-3 w-3" />
-          </div>
-        )}
+        {/* No more pending indicator needed in new system */}
 
         {/* Card info overlay on hover */}
         <div className="absolute inset-0 bg-black/0 hover:bg-black/80 transition-all duration-200 rounded-lg opacity-0 hover:opacity-100 flex flex-col items-center justify-center text-white p-2 text-center">
@@ -121,9 +103,6 @@ const BinderCardSlot = ({
           <span className="text-xs text-gray-300">#{cardData.number}</span>
           {cardData.rarity && (
             <span className="text-xs text-gray-300">{cardData.rarity}</span>
-          )}
-          {isPending && (
-            <span className="text-xs text-yellow-300 mt-1">Pending Save</span>
           )}
         </div>
       </div>

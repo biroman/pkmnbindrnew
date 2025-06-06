@@ -1,5 +1,6 @@
 import { getPageAndSlotFromSlotNumber } from "./slotAssignment";
-import { addCardMoveToPending } from "./localBinderStorage";
+import { moveCardInLocalBinder } from "./localBinderStorage";
+import { getAllLocalCards } from "./localBinderStorage";
 
 /**
  * Utility functions for handling card movements in binders
@@ -21,24 +22,17 @@ export const moveCardToSlot = (binderId, sourceCard, targetSlot, gridSize) => {
       gridSize
     );
 
-    const moveData = {
-      cardId: sourceCard.id,
-      cardName: sourceCard.name,
-      fromPageNumber: sourceCard.pageNumber,
-      fromSlotInPage: sourceCard.slotInPage,
-      fromOverallSlotNumber: sourceCard.overallSlotNumber,
-      toPageNumber: pageNumber,
-      toSlotInPage: slotInPage,
-      toOverallSlotNumber: targetSlot,
-      moveType: "move",
+    const newPosition = {
+      pageNumber,
+      slotInPage,
+      overallSlotNumber: targetSlot,
     };
 
-    const result = addCardMoveToPending(binderId, moveData);
+    const result = moveCardInLocalBinder(binderId, sourceCard.id, newPosition);
 
     if (result.success) {
       return {
         success: true,
-        moveId: result.moveId,
         changes: [
           {
             type: "move",
@@ -84,67 +78,60 @@ export const swapCards = (
     const sourcePosition = getPageAndSlotFromSlotNumber(sourceSlot, gridSize);
     const targetPosition = getPageAndSlotFromSlotNumber(targetSlot, gridSize);
 
-    const moveData = {
-      cardId: sourceCard.id,
-      cardName: sourceCard.name,
-      fromPageNumber: sourceCard.pageNumber,
-      fromSlotInPage: sourceCard.slotInPage,
-      fromOverallSlotNumber: sourceCard.overallSlotNumber,
-      toPageNumber: targetPosition.pageNumber,
-      toSlotInPage: targetPosition.slotInPage,
-      toOverallSlotNumber: targetSlot,
-      moveType: "swap",
-      targetCard: {
-        cardId: targetCard.id,
-        cardName: targetCard.name,
-        fromPageNumber: targetCard.pageNumber,
-        fromSlotInPage: targetCard.slotInPage,
-        fromOverallSlotNumber: targetCard.overallSlotNumber,
-        toPageNumber: sourcePosition.pageNumber,
-        toSlotInPage: sourcePosition.slotInPage,
-        toOverallSlotNumber: sourceSlot,
-      },
-    };
+    // Move source card to target position
+    const sourceResult = moveCardInLocalBinder(binderId, sourceCard.id, {
+      pageNumber: targetPosition.pageNumber,
+      slotInPage: targetPosition.slotInPage,
+      overallSlotNumber: targetSlot,
+    });
 
-    const result = addCardMoveToPending(binderId, moveData);
-
-    if (result.success) {
-      return {
-        success: true,
-        moveId: result.moveId,
-        changes: [
-          {
-            type: "swap",
-            sourceCard: {
-              id: sourceCard.id,
-              name: sourceCard.name,
-              from: {
-                pageNumber: sourceCard.pageNumber,
-                slotInPage: sourceCard.slotInPage,
-              },
-              to: {
-                pageNumber: targetPosition.pageNumber,
-                slotInPage: targetPosition.slotInPage,
-              },
-            },
-            targetCard: {
-              id: targetCard.id,
-              name: targetCard.name,
-              from: {
-                pageNumber: targetCard.pageNumber,
-                slotInPage: targetCard.slotInPage,
-              },
-              to: {
-                pageNumber: sourcePosition.pageNumber,
-                slotInPage: sourcePosition.slotInPage,
-              },
-            },
-          },
-        ],
-      };
+    if (!sourceResult.success) {
+      return sourceResult;
     }
 
-    return result;
+    // Move target card to source position
+    const targetResult = moveCardInLocalBinder(binderId, targetCard.id, {
+      pageNumber: sourcePosition.pageNumber,
+      slotInPage: sourcePosition.slotInPage,
+      overallSlotNumber: sourceSlot,
+    });
+
+    if (!targetResult.success) {
+      return targetResult;
+    }
+
+    return {
+      success: true,
+      changes: [
+        {
+          type: "swap",
+          sourceCard: {
+            id: sourceCard.id,
+            name: sourceCard.name,
+            from: {
+              pageNumber: sourceCard.pageNumber,
+              slotInPage: sourceCard.slotInPage,
+            },
+            to: {
+              pageNumber: targetPosition.pageNumber,
+              slotInPage: targetPosition.slotInPage,
+            },
+          },
+          targetCard: {
+            id: targetCard.id,
+            name: targetCard.name,
+            from: {
+              pageNumber: targetCard.pageNumber,
+              slotInPage: targetCard.slotInPage,
+            },
+            to: {
+              pageNumber: sourcePosition.pageNumber,
+              slotInPage: sourcePosition.slotInPage,
+            },
+          },
+        },
+      ],
+    };
   } catch (error) {
     console.error("Error swapping cards:", error);
     return { success: false, error: error.message };
@@ -171,6 +158,15 @@ export const generateDragId = (slot, card = null) => {
  */
 export const parseDragId = (dragId) => {
   if (dragId.startsWith("card-")) {
+    // Handle card IDs that may contain dashes by looking for the '-slot-' delimiter
+    const slotIndex = dragId.lastIndexOf("-slot-");
+    if (slotIndex !== -1) {
+      const cardId = dragId.substring(5, slotIndex); // Remove 'card-' prefix
+      const slot = parseInt(dragId.substring(slotIndex + 6)); // Remove '-slot-' and parse number
+      return { type: "card", cardId, slot };
+    }
+
+    // Fallback to old parsing if '-slot-' delimiter not found
     const parts = dragId.split("-");
     const cardId = parts[1];
     const slot = parseInt(parts[3]);
@@ -187,9 +183,15 @@ export const parseDragId = (dragId) => {
  * @param {Object} sourceInfo - Source drag information
  * @param {Object} targetInfo - Target drag information
  * @param {Array} allCards - All cards in the binder
+ * @param {string} binderId - Binder ID (optional, for fallback lookup)
  * @returns {Object} Validation result
  */
-export const validateCardMove = (sourceInfo, targetInfo, allCards) => {
+export const validateCardMove = (
+  sourceInfo,
+  targetInfo,
+  allCards,
+  binderId = null
+) => {
   // Can't drop on the same slot
   if (sourceInfo.slot === targetInfo.slot) {
     return { isValid: false, reason: "Cannot drop on the same slot" };
@@ -200,15 +202,34 @@ export const validateCardMove = (sourceInfo, targetInfo, allCards) => {
     return { isValid: false, reason: "Can only drag cards" };
   }
 
-  // Find the source card
-  const sourceCard = allCards.find((card) => card.id === sourceInfo.cardId);
+  // Find the source card in the provided array
+  let sourceCard = allCards.find((card) => card.id === sourceInfo.cardId);
+
+  // If not found and we have a binderId, try getting fresh data from local storage
+  if (!sourceCard && binderId) {
+    console.log("Card not found in allCards, checking local storage...");
+    const freshCards = getAllLocalCards(binderId);
+    sourceCard = freshCards.find((card) => card.id === sourceInfo.cardId);
+
+    if (sourceCard) {
+      console.log("Found card in local storage:", sourceCard.id);
+    }
+  }
+
   if (!sourceCard) {
     return { isValid: false, reason: "Source card not found" };
   }
 
   // If target is a card, validate swap
   if (targetInfo.type === "card") {
-    const targetCard = allCards.find((card) => card.id === targetInfo.cardId);
+    let targetCard = allCards.find((card) => card.id === targetInfo.cardId);
+
+    // If not found and we have a binderId, try getting fresh data from local storage
+    if (!targetCard && binderId) {
+      const freshCards = getAllLocalCards(binderId);
+      targetCard = freshCards.find((card) => card.id === targetInfo.cardId);
+    }
+
     if (!targetCard) {
       return { isValid: false, reason: "Target card not found" };
     }

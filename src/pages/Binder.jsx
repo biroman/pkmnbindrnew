@@ -51,12 +51,15 @@ const Binder = () => {
   // Memoize saved cards to prevent infinite loops
   const memoizedSavedCards = useMemo(() => {
     const cards = binderState?.allVisibleCards || [];
-    console.log("Memoized saved cards updated:", cards.length, "cards");
     return cards;
   }, [binderState?.allVisibleCards]);
 
-  // Use local card state for immediate UI updates during drag operations
-  const localCardState = useLocalCardState(memoizedSavedCards, binderId);
+  // Use local card state as source of truth (no more overlays)
+  const localCardState = useLocalCardState(
+    memoizedSavedCards,
+    binderId,
+    preferences
+  );
 
   // Binder name state management - now driven by preferences.binderName
   // The local binderName, isEditingName, tempName can be removed if
@@ -181,78 +184,35 @@ const Binder = () => {
 
       console.log("Position mapping:", Array.from(positionMapping.entries()));
 
-      // Move all cards to their new page numbers - use localCards which includes pending moves
+      // Move all cards to their new page numbers using local card state
       if (localCardState.localCards && localCardState.localCards.length > 0) {
-        const cardsToMove = [];
+        const cardUpdates = [];
 
         localCardState.localCards.forEach((card) => {
           const newPageNumber = positionMapping.get(card.pageNumber);
           if (newPageNumber && newPageNumber !== card.pageNumber) {
-            cardsToMove.push({
+            cardUpdates.push({
               cardId: card.id,
-              cardName: card.name || `Card ${card.number}`,
-              fromPageNumber: card.pageNumber,
-              fromSlotInPage: card.slotInPage,
-              fromOverallSlotNumber: card.overallSlotNumber,
-              toPageNumber: newPageNumber,
-              toSlotInPage: card.slotInPage,
-              toOverallSlotNumber:
+              pageNumber: newPageNumber,
+              slotInPage: card.slotInPage,
+              overallSlotNumber:
                 (newPageNumber - 1) * binderState.slotsPerPage +
                 card.slotInPage,
-              moveType: "move",
             });
           }
         });
 
-        console.log(`Moving ${cardsToMove.length} cards due to page reorder`);
+        console.log(`Moving ${cardUpdates.length} cards due to page reorder`);
 
-        // Add page move as a single operation instead of individual card moves
-        if (cardsToMove.length > 0) {
-          import("../utils/localBinderStorage").then(
-            ({
-              addPageMoveToPending,
-              getPendingChangesSummary,
-              clearPendingChanges,
-            }) => {
-              console.log(
-                "Before adding page move:",
-                getPendingChangesSummary(binderId)
-              );
-
-              // Clear any existing pending changes to ensure clean state
-              clearPendingChanges(binderId);
-
-              addPageMoveToPending(binderId, {
-                fromPagePosition: oldIndex + 1,
-                toPagePosition: newIndex + 1,
-                affectedCards: cardsToMove.map((card) => ({
-                  cardId: card.cardId,
-                  cardName: card.cardName,
-                  toPageNumber: card.toPageNumber,
-                  toSlotInPage: card.toSlotInPage,
-                  toOverallSlotNumber: card.toOverallSlotNumber,
-                })),
-              });
-
-              console.log(
-                "After adding page move:",
-                getPendingChangesSummary(binderId)
-              );
-
-              // Trigger UI update for immediate card position changes
-              window.dispatchEvent(
-                new StorageEvent("storage", {
-                  key: `pokemon_binder_pending_${binderId}`,
-                })
-              );
-            }
-          );
+        // Apply all card moves immediately to local storage
+        if (cardUpdates.length > 0) {
+          localCardState.moveCards(cardUpdates);
         }
       }
 
-      // Return simple page structure - no complex ordering needed
+      // Return simple page structure
       return movedPagesArray.map((page, index) => ({
-        id: `page-${index + 1}`, // Simple sequential IDs
+        id: `page-${index + 1}`,
         number: index + 1,
       }));
     });
@@ -282,19 +242,9 @@ const Binder = () => {
 
   // Function to handle card movements (drag and drop)
   const handleCardMove = (result) => {
-    console.log("Card move result (local):", result);
-    if (result.success) {
-      console.log("Card moved successfully to local storage!");
-      // The save button will appear automatically because of pending changes
-
-      // Force a re-render of local card state to ensure UI updates
-      // This will trigger the useLocalCardState hook to re-apply pending movements
-      window.dispatchEvent(
-        new StorageEvent("storage", {
-          key: `pokemon_binder_pending_${binderId}`,
-        })
-      );
-    }
+    console.log("Card move result:", result);
+    // The new system handles moves immediately in local storage
+    // No need for additional logic here - it's all handled in the drag component
   };
 
   // Show loading states
@@ -547,6 +497,7 @@ const Binder = () => {
             onCardMove={handleCardMove}
             isDragEnabled={!isOverviewModeActive}
             onAddCard={handleAddCards}
+            binderId={binderId}
           />
         )}
       </WorkspaceLayout>

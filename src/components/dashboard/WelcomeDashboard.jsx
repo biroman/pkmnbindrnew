@@ -6,355 +6,312 @@ import {
   useUserActivity,
 } from "../../hooks/useUserData";
 import { Card } from "../ui";
-import Button from "../ui/Button";
 import {
   Plus,
-  Share2,
-  Eye,
   BookOpen,
-  Star,
   TrendingUp,
-  Calendar,
-  Users,
-  Crown,
-  Zap,
-  Gift,
-  Trophy,
+  Award,
+  BookMarked,
+  Sparkles,
+  History,
+  LayoutGrid,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
+
+// Animation variants for the dashboard elements
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+    },
+  },
+};
 
 const WelcomeDashboard = () => {
   const { currentUser } = useAuth();
   const { data: userProfile } = useUserProfile(currentUser?.uid);
   const { data: userBinders, isLoading: bindersLoading } = useUserBinders(
     currentUser?.uid,
-    { limit: 5 }
+    { limit: 5 } // Fetch recent binders for "Jump Back In"
   );
   const { data: userActivity, isLoading: activityLoading } = useUserActivity(
     currentUser?.uid,
-    5
+    5 // Fetch recent activities
   );
 
   const displayName = userProfile?.data?.displayName || "Trainer";
-
-  // Real user stats from profile
-  const totalBinders = userProfile?.data?.totalBinders || 0;
-  const totalCards = userProfile?.data?.totalCards || 0;
-  const sharedBinders = userProfile?.data?.sharedBinders || 0;
-  const views = userProfile?.data?.totalViews || 0;
-
-  // Calculate real stats from actual data
   const recentBinders = userBinders?.data || [];
   const recentActivities = userActivity?.data || [];
 
-  // Real calculated stats
-  const realStats = {
-    favoriteCards: recentBinders.filter((binder) => binder.isFavorite).length,
-    rareCards: recentBinders.filter(
-      (binder) =>
-        binder.rarity === "Rare" ||
-        binder.rarity === "Epic" ||
-        binder.rarity === "Legendary"
-    ).length,
-    completedSets: recentBinders.filter((binder) => binder.isComplete).length,
-    recentlyAdded: recentActivities.filter(
-      (activity) =>
-        activity.type === "binder_added" &&
-        new Date(activity.timestamp?.toDate?.() || activity.timestamp) >
-          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    ).length,
-  };
+  // Key Performance Indicators (KPIs)
+  const kpis = [
+    {
+      label: "Total Cards",
+      value: userProfile?.data?.totalCards || 0,
+      icon: <BookOpen className="h-6 w-6 text-blue-500" />,
+    },
+    {
+      label: "Total Binders",
+      value: userProfile?.data?.totalBinders || 0,
+      icon: <LayoutGrid className="h-6 w-6 text-purple-500" />,
+    },
+    {
+      label: "Collection Value",
+      value: `$${(userProfile?.data?.collectionValue || 0).toLocaleString()}`,
+      icon: <TrendingUp className="h-6 w-6 text-green-500" />,
+    },
+    {
+      label: "Sets Completed",
+      value: userProfile?.data?.completedSets || 0,
+      icon: <Award className="h-6 w-6 text-yellow-500" />,
+    },
+  ];
 
+  // Quick Actions
   const quickActions = [
     {
-      title: "Create New Binder",
-      description: "Start organizing a new collection",
-      icon: <Plus className="h-5 w-5" />,
+      title: "Create Binder",
       href: "/app/collections",
-      color: "bg-blue-500 hover:bg-blue-600",
+      icon: <Plus className="h-8 w-8" />,
+      color: "from-blue-500 to-blue-600",
     },
     {
-      title: "Add Cards",
-      description: "Add cards to your collection",
-      icon: <BookOpen className="h-5 w-5" />,
+      title: "Add New Cards",
       href: "/app/add-card",
-      color: "bg-green-500 hover:bg-green-600",
+      icon: <BookMarked className="h-8 w-8" />,
+      color: "from-green-500 to-green-600",
     },
     {
-      title: "Share Collection",
-      description: "Share your binders with friends",
-      icon: <Share2 className="h-5 w-5" />,
-      href: "/app/collections",
-      color: "bg-purple-500 hover:bg-purple-600",
-    },
-    {
-      title: "View Statistics",
-      description: "Analyze your collection data",
-      icon: <TrendingUp className="h-5 w-5" />,
-      href: "/app/stats",
-      color: "bg-orange-500 hover:bg-orange-600",
+      title: "Explore Sets",
+      href: "/app/sets", // Assuming a route for exploring sets
+      icon: <Sparkles className="h-8 w-8" />,
+      color: "from-purple-500 to-purple-600",
     },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 mt-16 sm:px-6 lg:px-8">
-      <div className="space-y-8">
-        {/* Key Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-6 text-center hover:shadow-md transition-shadow">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full w-fit mx-auto mb-3">
-              <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              {totalCards.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Total Cards
-            </div>
-          </Card>
+    <motion.div
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Personalized Header */}
+      <motion.div variants={itemVariants} className="flex items-center gap-4">
+        <img
+          src={
+            userProfile?.data?.photoURL ||
+            `https://api.dicebear.com/8.x/bottts/svg?seed=${currentUser?.uid}`
+          }
+          alt="Profile"
+          className="h-16 w-16 rounded-full border-2 border-blue-500 p-1"
+        />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {displayName}!
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Let's get your collection organized.
+          </p>
+        </div>
+      </motion.div>
 
-          <Card className="p-6 text-center hover:shadow-md transition-shadow">
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full w-fit mx-auto mb-3">
-              <Share2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+      {/* At-a-Glance KPI Section */}
+      <motion.div
+        variants={itemVariants}
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+      >
+        {kpis.map((kpi) => (
+          <Card
+            key={kpi.label}
+            className="p-4 flex items-center gap-4 hover:shadow-lg transition-shadow duration-300"
+          >
+            <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              {kpi.icon}
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              {sharedBinders}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Shared Binders
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {kpi.label}
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {kpi.value}
+              </p>
             </div>
           </Card>
+        ))}
+      </motion.div>
 
-          <Card className="p-6 text-center hover:shadow-md transition-shadow">
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full w-fit mx-auto mb-3">
-              <Eye className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              {views.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Total Views
-            </div>
-          </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          {/* "Jump Back In" - Recent Binders */}
+          <motion.div variants={itemVariants}>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+              Jump Back In
+            </h2>
+            {bindersLoading ? (
+              <p>Loading binders...</p>
+            ) : recentBinders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <AnimatePresence>
+                  {recentBinders.slice(0, 3).map((binder, index) => (
+                    <motion.div
+                      key={binder.id}
+                      variants={itemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Link to={`/app/binder/${binder.id}`}>
+                        <Card className="p-4 h-full flex flex-col justify-between group overflow-hidden relative hover:shadow-xl transition-shadow duration-300">
+                          <div>
+                            <h3 className="font-bold text-lg text-gray-900 dark:text-white truncate">
+                              {binder.binderName}
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                              {binder.cardCount || 0} /{" "}
+                              {binder.totalSlots || "N/A"} cards
+                            </p>
+                          </div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                            <div
+                              className="bg-blue-600 h-2.5 rounded-full"
+                              style={{
+                                width: `${
+                                  (binder.cardCount / binder.totalSlots) * 100
+                                }%`,
+                              }}
+                            ></div>
+                          </div>
+                          <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        </Card>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400">
+                No binders created yet. Start a new one!
+              </p>
+            )}
+          </motion.div>
 
-          <Card className="p-6 text-center hover:shadow-md transition-shadow">
-            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full w-fit mx-auto mb-3">
-              <Star className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+          {/* Quick Actions Panel */}
+          <motion.div variants={itemVariants}>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+              Quick Actions
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {quickActions.map((action) => (
+                <Link key={action.title} to={action.href}>
+                  <div
+                    className={`p-6 rounded-xl text-white bg-gradient-to-br ${action.color} flex flex-col items-center justify-center text-center h-40 hover:scale-105 hover:shadow-lg transition-all duration-300`}
+                  >
+                    {action.icon}
+                    <h3 className="mt-2 font-semibold">{action.title}</h3>
+                  </div>
+                </Link>
+              ))}
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              {realStats.favoriteCards}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Favorite Cards
-            </div>
-          </Card>
+          </motion.div>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Quick Actions & Collection Overview */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Quick Actions */}
+        <div className="lg:col-span-1 space-y-8">
+          {/* Wishlist / Collection Goals */}
+          <motion.div variants={itemVariants}>
             <Card className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-                Quick Actions
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Collection Goal
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {quickActions.map((action, index) => (
+              <div>
+                <div className="flex justify-between items-baseline mb-1">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">
+                    Base Set Completion
+                  </h3>
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    98%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                  <div
+                    className="bg-blue-600 h-2.5 rounded-full"
+                    style={{ width: "98%" }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Missing 2 cards.{" "}
                   <Link
-                    key={index}
-                    to={action.href}
-                    className={`${action.color} text-white p-5 rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg group block`}
+                    to="/app/wishlist"
+                    className="text-blue-600 hover:underline"
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="group-hover:scale-110 transition-transform duration-200">
-                        {action.icon}
+                    View Wishlist
+                  </Link>
+                </p>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Recent Activity Feed */}
+          <motion.div variants={itemVariants}>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Recent Activity
+            </h2>
+            {activityLoading ? (
+              <p>Loading activity...</p>
+            ) : recentActivities.length > 0 ? (
+              <div className="space-y-4">
+                <AnimatePresence>
+                  {recentActivities.map((activity, index) => (
+                    <motion.div
+                      key={activity.id}
+                      className="flex items-center gap-4"
+                      variants={itemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      transition={{ delay: index * 0.15 }}
+                    >
+                      <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full">
+                        <History className="h-5 w-5 text-gray-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-sm">
-                          {action.title}
-                        </h3>
-                        <p className="text-xs opacity-90 mt-1">
-                          {action.description}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-
-            {/* Collection Overview */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Collection Overview
-                </h2>
-                <Link
-                  to="/app/collections"
-                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                >
-                  View All →
-                </Link>
-              </div>
-
-              {totalBinders === 0 ? (
-                <div className="text-center py-12">
-                  <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-fit mx-auto mb-4">
-                    <BookOpen className="h-12 w-12 text-gray-400 dark:text-gray-600" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Start Your Pokemon Journey
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    Create your first binder and start organizing your Pokemon
-                    cards. Share your collection with friends and fellow
-                    collectors!
-                  </p>
-                  <Link
-                    to="/app/collections"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors inline-flex items-center space-x-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Create First Binder</span>
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <Crown className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
-                      {realStats.rareCards}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Rare Cards
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <Zap className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
-                      {realStats.completedSets}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Complete Sets
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <Gift className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
-                      {realStats.recentlyAdded}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Added This Week
-                    </div>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <Users className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
-                      {views}
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      Profile Views
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </div>
-
-          {/* Right Column - Recent Activity & Featured */}
-          <div className="space-y-6">
-            {/* Recent Activity */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Recent Activity
-              </h3>
-              <div className="space-y-3">
-                {recentActivities.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-                    <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No recent activity</p>
-                  </div>
-                ) : (
-                  recentActivities.map((activity, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                    >
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                        {activity.type === "binder_added" && (
-                          <Plus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        )}
-                        {activity.type === "binder_shared" && (
-                          <Share2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        )}
-                        {activity.type === "profile_updated" && (
-                          <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                        )}
-                        {![
-                          "binder_added",
-                          "binder_shared",
-                          "profile_updated",
-                        ].includes(activity.type) && (
-                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900 dark:text-white">
-                          {activity.description || activity.type}
+                        <p className="text-sm text-gray-800 dark:text-gray-200">
+                          {activity.description || "An action was performed."}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {activity.timestamp
-                            ? new Date(
-                                activity.timestamp?.toDate?.() ||
-                                  activity.timestamp
-                              ).toLocaleDateString()
-                            : "Recently"}
+                          {formatDistanceToNow(
+                            activity.timestamp?.toDate?.() || new Date(),
+                            { addSuffix: true }
+                          )}
                         </p>
                       </div>
-                    </div>
-                  ))
-                )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
-            </Card>
-
-            {/* Featured Binder */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Featured Collection
-              </h3>
-              {totalBinders === 0 ? (
-                <div className="text-center py-6">
-                  <BookOpen className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Create your first binder to see it featured here
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <Star className="h-5 w-5 text-yellow-500" />
-                    <h4 className="font-semibold text-gray-900 dark:text-white">
-                      My Champion Cards
-                    </h4>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Your most viewed collection with rare Pokemon cards
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      142 views • 28 cards
-                    </span>
-                    <Button size="sm" variant="outline">
-                      View
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </div>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400">
+                No recent activity to show.
+              </p>
+            )}
+          </motion.div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

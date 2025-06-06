@@ -5,410 +5,624 @@
  * Optimized for performance and minimal Firebase writes.
  */
 
-const STORAGE_KEY_PREFIX = "pokemon_binder_pending_";
-const STORAGE_VERSION = "1.0";
+// New simplified local storage approach - store complete binder state locally
+
+const BINDER_STORAGE_KEY_PREFIX = "pokemon_binder_";
+const STORAGE_VERSION = "2.0";
 
 /**
- * Get the storage key for a specific binder
+ * Get the storage key for a binder's complete state
  */
-const getStorageKey = (binderId) => `${STORAGE_KEY_PREFIX}${binderId}`;
+const getBinderStorageKey = (binderId) =>
+  `${BINDER_STORAGE_KEY_PREFIX}${binderId}`;
 
 /**
- * Get pending changes for a binder
+ * Get the sync status key for a binder
  */
-export const getPendingChanges = (binderId) => {
+const getSyncStatusKey = (binderId) =>
+  `${BINDER_STORAGE_KEY_PREFIX}${binderId}_sync`;
+
+/**
+ * Get complete binder state from local storage
+ */
+export const getLocalBinderState = (binderId) => {
   try {
-    const data = localStorage.getItem(getStorageKey(binderId));
+    const data = localStorage.getItem(getBinderStorageKey(binderId));
     if (!data) return null;
 
     const parsed = JSON.parse(data);
 
     // Validate structure and version
     if (parsed.version !== STORAGE_VERSION) {
-      console.warn("Pending changes version mismatch, clearing data");
-      clearPendingChanges(binderId);
+      console.warn("Binder state version mismatch, clearing local data");
+      clearLocalBinderState(binderId);
       return null;
     }
 
     return parsed;
   } catch (error) {
-    console.error("Error reading pending changes:", error);
+    console.error("Error reading local binder state:", error);
     return null;
   }
 };
 
 /**
- * Save pending changes for a binder
+ * Save complete binder state to local storage
  */
-export const savePendingChanges = (binderId, changes) => {
+export const saveLocalBinderState = (binderId, binderState) => {
   try {
-    const data = {
+    const dataToSave = {
       version: STORAGE_VERSION,
       binderId,
+      cards: binderState.cards || [],
+      preferences: binderState.preferences || {},
       lastModified: new Date().toISOString(),
-      ...changes,
     };
 
-    localStorage.setItem(getStorageKey(binderId), JSON.stringify(data));
-    return true;
-  } catch (error) {
-    console.error("Error saving pending changes:", error);
-    return false;
-  }
-};
-
-/**
- * Clear pending changes for a binder
- */
-export const clearPendingChanges = (binderId) => {
-  try {
-    localStorage.removeItem(getStorageKey(binderId));
-    return true;
-  } catch (error) {
-    console.error("Error clearing pending changes:", error);
-    return false;
-  }
-};
-
-/**
- * Add cards to pending additions with slot assignments
- */
-export const addCardsToPending = (binderId, cardsWithSlots) => {
-  const existing = getPendingChanges(binderId) || {
-    addedCards: [],
-    removedCardIds: [],
-    updatedCards: [],
-    movedCards: [], // Track card movements
-    pageMoves: [], // Track page movements as single operations
-  };
-
-  // Process each card to add with slot assignment
-  const cardsToAdd = cardsWithSlots.map((cardData) => ({
-    tempId: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    pokemonCardId: cardData.id,
-    pageNumber: cardData.assignedSlot?.pageNumber || null,
-    slotInPage: cardData.assignedSlot?.slotInPage || null,
-    overallSlotNumber: cardData.assignedSlot?.overallSlotNumber || null,
-    cardData: {
-      name: cardData.name,
-      set: cardData.set?.name || "",
-      setId: cardData.set?.id || "",
-      number: cardData.number || "",
-      rarity: cardData.rarity || "",
-      images: cardData.images || {},
-      tcgplayer: cardData.tcgplayer || {},
-      artist: cardData.artist || "",
-      cardmarket: cardData.cardmarket || {},
-    },
-    addedAt: new Date().toISOString(),
-    status: "pending",
-  }));
-
-  // Allow duplicate cards - each card gets a unique tempId and slot assignment
-  const updated = {
-    ...existing,
-    addedCards: [...existing.addedCards, ...cardsToAdd],
-  };
-
-  savePendingChanges(binderId, updated);
-
-  return {
-    success: true,
-    addedCount: cardsToAdd.length,
-    duplicatesSkipped: 0, // No duplicates are skipped now
-  };
-};
-
-/**
- * Remove a card from pending additions
- */
-export const removeCardFromPending = (binderId, tempId) => {
-  const existing = getPendingChanges(binderId);
-  if (!existing) return false;
-
-  const updated = {
-    ...existing,
-    addedCards: existing.addedCards.filter((card) => card.tempId !== tempId),
-  };
-
-  return savePendingChanges(binderId, updated);
-};
-
-/**
- * Get count of pending changes
- */
-export const getPendingChangesCount = (binderId) => {
-  const changes = getPendingChanges(binderId);
-  if (!changes) return 0;
-
-  return (
-    (changes.addedCards?.length || 0) +
-    (changes.removedCardIds?.length || 0) +
-    (changes.updatedCards?.length || 0) +
-    (changes.movedCards?.length || 0) +
-    (changes.pageMoves?.length || 0)
-  );
-};
-
-/**
- * Check if there are any pending changes
- */
-export const hasPendingChanges = (binderId) => {
-  return getPendingChangesCount(binderId) > 0;
-};
-
-/**
- * Get all pending card additions (for UI display)
- */
-export const getPendingCardAdditions = (binderId) => {
-  const changes = getPendingChanges(binderId);
-  return changes?.addedCards || [];
-};
-
-/**
- * Add a page movement to pending changes (counts as 1 change instead of many card movements)
- */
-export const addPageMoveToPending = (binderId, pageMoveData) => {
-  const existing = getPendingChanges(binderId) || {
-    addedCards: [],
-    removedCardIds: [],
-    updatedCards: [],
-    movedCards: [],
-    pageMoves: [],
-  };
-
-  const pageMoveEntry = {
-    moveId: `pageMove_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    fromPagePosition: pageMoveData.fromPagePosition,
-    toPagePosition: pageMoveData.toPagePosition,
-    affectedCards: pageMoveData.affectedCards, // Array of cards that will be moved
-    timestamp: new Date().toISOString(),
-    description: `Move page ${pageMoveData.fromPagePosition} to position ${pageMoveData.toPagePosition}`,
-  };
-
-  const updated = {
-    ...existing,
-    pageMoves: [...existing.pageMoves, pageMoveEntry],
-  };
-
-  savePendingChanges(binderId, updated);
-  return { success: true, moveId: pageMoveEntry.moveId };
-};
-
-/**
- * Add a card movement to pending changes
- */
-export const addCardMoveToPending = (binderId, moveData) => {
-  const existing = getPendingChanges(binderId) || {
-    addedCards: [],
-    removedCardIds: [],
-    updatedCards: [],
-    movedCards: [],
-    pageMoves: [],
-  };
-
-  // Check if this card already has a pending movement
-  const existingMoveIndex = existing.movedCards.findIndex(
-    (move) => move.cardId === moveData.cardId
-  );
-
-  const moveEntry = {
-    moveId: `move_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    cardId: moveData.cardId,
-    cardName: moveData.cardName,
-    fromPosition: {
-      pageNumber: moveData.fromPageNumber,
-      slotInPage: moveData.fromSlotInPage,
-      overallSlotNumber: moveData.fromOverallSlotNumber,
-    },
-    toPosition: {
-      pageNumber: moveData.toPageNumber,
-      slotInPage: moveData.toSlotInPage,
-      overallSlotNumber: moveData.toOverallSlotNumber,
-    },
-    moveType: moveData.moveType, // 'move' or 'swap'
-    timestamp: new Date().toISOString(),
-  };
-
-  const movedCards = [...existing.movedCards];
-
-  if (moveData.moveType === "swap" && moveData.targetCard) {
-    // Handle swap - need to update or add both cards
-    const targetExistingIndex = movedCards.findIndex(
-      (move) => move.cardId === moveData.targetCard.cardId
+    localStorage.setItem(
+      getBinderStorageKey(binderId),
+      JSON.stringify(dataToSave)
     );
 
-    // Update or add source card movement
-    if (existingMoveIndex >= 0) {
-      movedCards[existingMoveIndex] = moveEntry;
-    } else {
-      movedCards.push(moveEntry);
-    }
+    // Mark as needing sync
+    setSyncStatus(binderId, {
+      needsSync: true,
+      lastModified: dataToSave.lastModified,
+    });
 
-    // Update or add target card movement
-    const targetMoveEntry = {
-      moveId: `move_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      cardId: moveData.targetCard.cardId,
-      cardName: moveData.targetCard.cardName,
-      fromPosition: {
-        pageNumber: moveData.targetCard.fromPageNumber,
-        slotInPage: moveData.targetCard.fromSlotInPage,
-        overallSlotNumber: moveData.targetCard.fromOverallSlotNumber,
-      },
-      toPosition: {
-        pageNumber: moveData.targetCard.toPageNumber,
-        slotInPage: moveData.targetCard.toSlotInPage,
-        overallSlotNumber: moveData.targetCard.toOverallSlotNumber,
-      },
-      moveType: "swap",
-      swapPairId: moveEntry.moveId,
-      timestamp: new Date().toISOString(),
-    };
-
-    if (targetExistingIndex >= 0) {
-      movedCards[targetExistingIndex] = targetMoveEntry;
-    } else {
-      movedCards.push(targetMoveEntry);
-    }
-  } else {
-    // Simple move - update existing or add new
-    if (existingMoveIndex >= 0) {
-      // Update existing movement for this card
-      movedCards[existingMoveIndex] = moveEntry;
-    } else {
-      // Add new movement
-      movedCards.push(moveEntry);
-    }
-  }
-
-  const updated = {
-    ...existing,
-    movedCards,
-  };
-
-  savePendingChanges(binderId, updated);
-  return { success: true, moveId: moveEntry.moveId };
-};
-
-/**
- * Get all pending card movements
- */
-export const getPendingCardMoves = (binderId) => {
-  const changes = getPendingChanges(binderId);
-  return changes?.movedCards || [];
-};
-
-/**
- * Get all pending page moves
- */
-export const getPendingPageMoves = (binderId) => {
-  const changes = getPendingChanges(binderId);
-  return changes?.pageMoves || [];
-};
-
-/**
- * Clear a specific card movement from pending changes
- */
-export const removeCardMoveFromPending = (binderId, moveId) => {
-  const existing = getPendingChanges(binderId);
-  if (!existing) return false;
-
-  const updated = {
-    ...existing,
-    movedCards: existing.movedCards.filter((move) => move.moveId !== moveId),
-  };
-
-  return savePendingChanges(binderId, updated);
-};
-
-/**
- * Get summary of pending changes
- */
-export const getPendingChangesSummary = (binderId) => {
-  const changes = getPendingChanges(binderId);
-  if (!changes) {
-    return {
-      totalChanges: 0,
-      addedCards: 0,
-      removedCards: 0,
-      updatedCards: 0,
-      movedCards: 0,
-      pageMoves: 0,
-    };
-  }
-
-  const addedCards = changes.addedCards?.length || 0;
-  const removedCards = changes.removedCardIds?.length || 0;
-  const updatedCards = changes.updatedCards?.length || 0;
-  const movedCards = changes.movedCards?.length || 0;
-  const pageMoves = changes.pageMoves?.length || 0;
-
-  return {
-    totalChanges:
-      addedCards + removedCards + updatedCards + movedCards + pageMoves,
-    addedCards,
-    removedCards,
-    updatedCards,
-    movedCards,
-    pageMoves,
-    lastModified: changes.lastModified,
-  };
-};
-
-/**
- * Clear all pending changes for all binders (useful for debugging/reset)
- */
-export const clearAllPendingChanges = () => {
-  try {
-    const keys = Object.keys(localStorage);
-    const binderKeys = keys.filter((key) => key.startsWith(STORAGE_KEY_PREFIX));
-
-    binderKeys.forEach((key) => localStorage.removeItem(key));
-
-    return {
-      success: true,
-      clearedCount: binderKeys.length,
-    };
+    return true;
   } catch (error) {
-    console.error("Error clearing all pending changes:", error);
-    return {
-      success: false,
-      error: error.message,
-    };
+    console.error("Error saving local binder state:", error);
+    return false;
   }
 };
 
 /**
- * Get storage usage information
+ * Initialize local binder state from Firebase data
  */
-export const getStorageInfo = () => {
-  try {
-    const keys = Object.keys(localStorage);
-    const binderKeys = keys.filter((key) => key.startsWith(STORAGE_KEY_PREFIX));
+export const initializeLocalBinderState = (
+  binderId,
+  firebaseCards = [],
+  preferences = {}
+) => {
+  console.log("initializeLocalBinderState called with:", {
+    binderId,
+    firebaseCardsLength: firebaseCards.length,
+    firebaseCards: firebaseCards.map((c) => ({
+      id: c.id,
+      page: c.pageNumber,
+      slot: c.slotInPage,
+    })),
+    preferences,
+  });
 
-    let totalSize = 0;
-    let totalCards = 0;
+  const localState = getLocalBinderState(binderId);
+  const isLocalEmpty =
+    !localState || !localState.cards || localState.cards.length === 0;
+  const hasFirebaseCards = firebaseCards.length > 0;
+  const hasLocalChanges = needsSync(binderId);
 
-    binderKeys.forEach((key) => {
-      const data = localStorage.getItem(key);
-      totalSize += data.length;
+  console.log("State analysis:", {
+    isLocalEmpty,
+    hasFirebaseCards,
+    hasLocalChanges,
+    localState: localState
+      ? { cardsCount: localState.cards?.length || 0 }
+      : null,
+  });
 
-      try {
-        const parsed = JSON.parse(data);
-        totalCards += parsed.addedCards?.length || 0;
-      } catch (e) {
-        // Skip invalid entries
+  // If local is empty, definitely use Firebase data
+  if (isLocalEmpty) {
+    console.log("Local storage is empty, initializing with Firebase data");
+
+    const updatedState = {
+      version: STORAGE_VERSION,
+      binderId,
+      cards: firebaseCards,
+      preferences: { ...(localState?.preferences || {}), ...preferences },
+      lastModified: new Date().toISOString(),
+    };
+
+    // Save to local storage
+    localStorage.setItem(
+      getBinderStorageKey(binderId),
+      JSON.stringify(updatedState)
+    );
+
+    // Mark as synced (since this is from Firebase)
+    setSyncStatus(binderId, {
+      needsSync: false,
+      lastSynced: updatedState.lastModified,
+    });
+
+    return updatedState;
+  }
+
+  // If local has changes, we need to be smarter about merging
+  if (hasLocalChanges && hasFirebaseCards) {
+    console.log(
+      "Local has changes and Firebase has cards, merging intelligently"
+    );
+
+    // Create a map of Firebase cards by position for easy lookup
+    const firebaseCardMap = new Map();
+    firebaseCards.forEach((card) => {
+      const key = `${card.pageNumber}-${card.slotInPage}`;
+      firebaseCardMap.set(key, card);
+    });
+
+    // Create a map of local cards by position
+    const localCardMap = new Map();
+    localState.cards.forEach((card) => {
+      const key = `${card.pageNumber}-${card.slotInPage}`;
+      localCardMap.set(key, card);
+    });
+
+    // Start with Firebase cards as base
+    const mergedCards = [...firebaseCards];
+
+    // Add or replace with local cards (local takes precedence)
+    localState.cards.forEach((localCard) => {
+      const key = `${localCard.pageNumber}-${localCard.slotInPage}`;
+      const existingIndex = mergedCards.findIndex(
+        (card) =>
+          card.pageNumber === localCard.pageNumber &&
+          card.slotInPage === localCard.slotInPage
+      );
+
+      if (existingIndex !== -1) {
+        // Replace existing Firebase card with local version
+        mergedCards[existingIndex] = localCard;
+        console.log(
+          `Replaced Firebase card with local card at position ${key}`
+        );
+      } else {
+        // Add new local card that doesn't exist in Firebase
+        mergedCards.push(localCard);
+        console.log(`Added new local card at position ${key}`);
       }
     });
 
-    return {
-      bindersWithPendingChanges: binderKeys.length,
-      totalPendingCards: totalCards,
-      approximateSize: `${(totalSize / 1024).toFixed(2)} KB`,
+    console.log("Merge result:", {
+      firebaseCardsCount: firebaseCards.length,
+      localCardsCount: localState.cards.length,
+      mergedCardsCount: mergedCards.length,
+      mergedCards: mergedCards.map((c) => ({
+        id: c.id,
+        page: c.pageNumber,
+        slot: c.slotInPage,
+      })),
+    });
+
+    const updatedState = {
       version: STORAGE_VERSION,
+      binderId,
+      cards: mergedCards,
+      preferences: { ...(localState?.preferences || {}), ...preferences },
+      lastModified: new Date().toISOString(),
     };
+
+    // Save to local storage
+    localStorage.setItem(
+      getBinderStorageKey(binderId),
+      JSON.stringify(updatedState)
+    );
+
+    // Keep sync status as is (still needs sync since we have local changes)
+    return updatedState;
+  }
+
+  // If local has no unsaved changes, update with Firebase data
+  if (!hasLocalChanges && hasFirebaseCards) {
+    console.log("No local changes detected, updating with fresh Firebase data");
+
+    const updatedState = {
+      version: STORAGE_VERSION,
+      binderId,
+      cards: firebaseCards,
+      preferences: { ...(localState?.preferences || {}), ...preferences },
+      lastModified: new Date().toISOString(),
+    };
+
+    // Save to local storage
+    localStorage.setItem(
+      getBinderStorageKey(binderId),
+      JSON.stringify(updatedState)
+    );
+
+    // Mark as synced (since this is from Firebase)
+    setSyncStatus(binderId, {
+      needsSync: false,
+      lastSynced: updatedState.lastModified,
+    });
+
+    return updatedState;
+  }
+
+  // If local state exists and has changes, keep it
+  if (localState && localState.lastModified) {
+    console.log("Local binder state exists with changes, using local version", {
+      cardsCount: localState.cards?.length || 0,
+    });
+    return localState;
+  }
+
+  // Initialize empty state if no Firebase data
+  const initialState = {
+    version: STORAGE_VERSION,
+    binderId,
+    cards: firebaseCards,
+    preferences,
+    lastModified: new Date().toISOString(),
+  };
+
+  console.log("Initializing new empty local state:", initialState);
+
+  // Save to local storage
+  localStorage.setItem(
+    getBinderStorageKey(binderId),
+    JSON.stringify(initialState)
+  );
+
+  // Mark as synced (since this is from Firebase)
+  setSyncStatus(binderId, {
+    needsSync: false,
+    lastSynced: initialState.lastModified,
+  });
+
+  return initialState;
+};
+
+/**
+ * Clear local binder state
+ */
+export const clearLocalBinderState = (binderId) => {
+  try {
+    localStorage.removeItem(getBinderStorageKey(binderId));
+    localStorage.removeItem(getSyncStatusKey(binderId));
+    return true;
   } catch (error) {
-    console.error("Error getting storage info:", error);
-    return null;
+    console.error("Error clearing local binder state:", error);
+    return false;
   }
 };
+
+/**
+ * Add cards to local binder state
+ */
+export const addCardsToLocalBinder = (binderId, cardsToAdd) => {
+  const localState = getLocalBinderState(binderId);
+  if (!localState) {
+    console.error("No local binder state found");
+    return { success: false, error: "No local binder state found" };
+  }
+
+  console.log("Adding cards to local binder:", {
+    binderId,
+    existingCardsCount: localState.cards.length,
+    cardsToAddCount: cardsToAdd.length,
+    existingCards: localState.cards.map((c) => ({
+      id: c.id,
+      page: c.pageNumber,
+      slot: c.slotInPage,
+    })),
+    cardsToAdd: cardsToAdd.map((c) => ({
+      id: c.id,
+      page: c.pageNumber,
+      slot: c.slotInPage,
+    })),
+  });
+
+  const updatedCards = [...localState.cards, ...cardsToAdd];
+
+  console.log("Final cards array after adding:", {
+    totalCount: updatedCards.length,
+    cards: updatedCards.map((c) => ({
+      id: c.id,
+      page: c.pageNumber,
+      slot: c.slotInPage,
+    })),
+  });
+
+  const success = saveLocalBinderState(binderId, {
+    ...localState,
+    cards: updatedCards,
+  });
+
+  return {
+    success,
+    addedCount: cardsToAdd.length,
+  };
+};
+
+/**
+ * Move card in local binder state
+ */
+export const moveCardInLocalBinder = (binderId, cardId, newPosition) => {
+  const localState = getLocalBinderState(binderId);
+  if (!localState) {
+    console.error("No local binder state found");
+    return { success: false, error: "No local binder state found" };
+  }
+
+  const updatedCards = localState.cards.map((card) => {
+    if (card.id === cardId) {
+      return {
+        ...card,
+        pageNumber: newPosition.pageNumber,
+        slotInPage: newPosition.slotInPage,
+        overallSlotNumber: newPosition.overallSlotNumber,
+      };
+    }
+    return card;
+  });
+
+  const success = saveLocalBinderState(binderId, {
+    ...localState,
+    cards: updatedCards,
+  });
+
+  return { success };
+};
+
+/**
+ * Move multiple cards (for page reordering)
+ */
+export const moveCardsInLocalBinder = (binderId, cardUpdates) => {
+  const localState = getLocalBinderState(binderId);
+  if (!localState) {
+    console.error("No local binder state found");
+    return { success: false, error: "No local binder state found" };
+  }
+
+  // Create a map for quick lookups
+  const updateMap = new Map(
+    cardUpdates.map((update) => [update.cardId, update])
+  );
+
+  const updatedCards = localState.cards.map((card) => {
+    const update = updateMap.get(card.id);
+    if (update) {
+      return {
+        ...card,
+        pageNumber: update.pageNumber,
+        slotInPage: update.slotInPage,
+        overallSlotNumber: update.overallSlotNumber,
+      };
+    }
+    return card;
+  });
+
+  const success = saveLocalBinderState(binderId, {
+    ...localState,
+    cards: updatedCards,
+  });
+
+  return {
+    success,
+    updatedCount: cardUpdates.length,
+  };
+};
+
+/**
+ * Update binder preferences in local state
+ */
+export const updateLocalBinderPreferences = (binderId, preferenceUpdates) => {
+  const localState = getLocalBinderState(binderId);
+  if (!localState) {
+    console.error("No local binder state found");
+    return { success: false, error: "No local binder state found" };
+  }
+
+  const updatedPreferences = {
+    ...localState.preferences,
+    ...preferenceUpdates,
+  };
+
+  const success = saveLocalBinderState(binderId, {
+    ...localState,
+    preferences: updatedPreferences,
+  });
+
+  return { success };
+};
+
+/**
+ * Get sync status for a binder
+ */
+export const getSyncStatus = (binderId) => {
+  try {
+    const data = localStorage.getItem(getSyncStatusKey(binderId));
+    if (!data) return { needsSync: false };
+    return JSON.parse(data);
+  } catch (error) {
+    console.error("Error reading sync status:", error);
+    return { needsSync: false };
+  }
+};
+
+/**
+ * Set sync status for a binder
+ */
+export const setSyncStatus = (binderId, status) => {
+  try {
+    localStorage.setItem(getSyncStatusKey(binderId), JSON.stringify(status));
+    return true;
+  } catch (error) {
+    console.error("Error setting sync status:", error);
+    return false;
+  }
+};
+
+/**
+ * Check if binder needs syncing
+ */
+export const needsSync = (binderId) => {
+  const status = getSyncStatus(binderId);
+  return status.needsSync === true;
+};
+
+/**
+ * Revert local binder state to match Firebase data
+ * This clears all local changes and reinitializes with provided Firebase data
+ */
+export const revertToFirebaseState = (
+  binderId,
+  firebaseCards = [],
+  preferences = {}
+) => {
+  console.log("Reverting local state to Firebase data", {
+    binderId,
+    firebaseCardsCount: firebaseCards.length,
+    preferences,
+  });
+
+  // Clear current local state
+  clearLocalBinderState(binderId);
+
+  // Reinitialize with fresh Firebase data
+  const revertedState = {
+    version: STORAGE_VERSION,
+    binderId,
+    cards: firebaseCards,
+    preferences,
+    lastModified: new Date().toISOString(),
+  };
+
+  // Save reverted state to local storage
+  localStorage.setItem(
+    getBinderStorageKey(binderId),
+    JSON.stringify(revertedState)
+  );
+
+  // Mark as synced (since this matches Firebase)
+  setSyncStatus(binderId, {
+    needsSync: false,
+    lastSynced: revertedState.lastModified,
+  });
+
+  console.log("Local state reverted successfully", {
+    revertedCardsCount: revertedState.cards.length,
+    revertedState: revertedState,
+  });
+  return revertedState;
+};
+
+/**
+ * Get cards for a specific page from local state
+ */
+export const getLocalCardsForPage = (binderId, pageNumber) => {
+  const localState = getLocalBinderState(binderId);
+  if (!localState) {
+    console.log(
+      `getLocalCardsForPage: No local state found for binder ${binderId}, page ${pageNumber}`
+    );
+    return [];
+  }
+
+  const allCards = localState.cards || [];
+  const filteredCards = allCards.filter(
+    (card) => card.pageNumber === pageNumber
+  );
+
+  // Only log if there are cards or if we're debugging a specific issue
+  if (filteredCards.length > 0 || pageNumber === 1) {
+    console.log(
+      `getLocalCardsForPage: Binder ${binderId}, Page ${pageNumber}`,
+      {
+        totalCards: allCards.length,
+        pageCards: filteredCards.length,
+      }
+    );
+  }
+
+  return filteredCards;
+};
+
+/**
+ * Get all cards from local state
+ */
+export const getAllLocalCards = (binderId) => {
+  const localState = getLocalBinderState(binderId);
+  console.log("getAllLocalCards called:", {
+    binderId,
+    cardsCount: localState?.cards?.length || 0,
+    hasLocalState: !!localState,
+  });
+  if (!localState) return [];
+  return localState.cards;
+};
+
+/**
+ * Get local binder preferences
+ */
+export const getLocalBinderPreferences = (binderId) => {
+  const localState = getLocalBinderState(binderId);
+  if (!localState) return {};
+  return localState.preferences;
+};
+
+// LEGACY FUNCTIONS - Keep these for backward compatibility but mark as deprecated
+
+/**
+ * @deprecated Use getLocalBinderState instead
+ */
+export const getPendingChanges = (binderId) => {
+  console.warn(
+    "getPendingChanges is deprecated, use getLocalBinderState instead"
+  );
+  return null;
+};
+
+/**
+ * @deprecated Use needsSync instead
+ */
+export const hasPendingChanges = (binderId) => {
+  console.warn("hasPendingChanges is deprecated, use needsSync instead");
+  return needsSync(binderId);
+};
+
+/**
+ * @deprecated Use getLocalBinderState instead
+ */
+export const getPendingChangesCount = (binderId) => {
+  console.warn("getPendingChangesCount is deprecated, use needsSync instead");
+  return needsSync(binderId) ? 1 : 0;
+};
+
+/**
+ * @deprecated Use clearLocalBinderState instead
+ */
+export const clearPendingChanges = (binderId) => {
+  console.warn("clearPendingChanges is deprecated, use setSyncStatus instead");
+  return setSyncStatus(binderId, {
+    needsSync: false,
+    lastSynced: new Date().toISOString(),
+  });
+};
+
+// Export all legacy functions to maintain compatibility
+export const savePendingChanges = () =>
+  console.warn("savePendingChanges is deprecated");
+export const addCardsToPending = () =>
+  console.warn("addCardsToPending is deprecated");
+export const removeCardFromPending = () =>
+  console.warn("removeCardFromPending is deprecated");
+export const addPageMoveToPending = () =>
+  console.warn("addPageMoveToPending is deprecated");
+export const addCardMoveToPending = () =>
+  console.warn("addCardMoveToPending is deprecated");
+export const getPendingCardMoves = () =>
+  console.warn("getPendingCardMoves is deprecated");
+export const getPendingPageMoves = () =>
+  console.warn("getPendingPageMoves is deprecated");
+export const removeCardMoveFromPending = () =>
+  console.warn("removeCardMoveFromPending is deprecated");
+export const getPendingChangesSummary = () =>
+  console.warn("getPendingChangesSummary is deprecated");
+export const clearAllPendingChanges = () =>
+  console.warn("clearAllPendingChanges is deprecated");
+export const getStorageInfo = () =>
+  console.warn("getStorageInfo is deprecated");
+export const getPendingCardAdditions = () =>
+  console.warn("getPendingCardAdditions is deprecated");

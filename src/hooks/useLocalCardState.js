@@ -1,226 +1,201 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
-  getPendingCardMoves,
-  getPendingPageMoves,
+  getLocalBinderState,
+  initializeLocalBinderState,
+  getAllLocalCards,
+  getLocalCardsForPage,
+  moveCardInLocalBinder,
+  moveCardsInLocalBinder,
+  addCardsToLocalBinder,
+  needsSync,
 } from "../utils/localBinderStorage";
 
 /**
- * Hook to manage local card state with pending movements
- * Provides immediate UI updates for card movements before Firebase sync
+ * Hook to manage local binder state as source of truth
+ * No more overlay - local storage IS the current state
  */
-export const useLocalCardState = (savedCards = [], binderId) => {
+export const useLocalCardState = (
+  firebaseCards = [],
+  binderId,
+  preferences = {}
+) => {
   const [localCards, setLocalCards] = useState([]);
-  const [pendingMovesVersion, setPendingMovesVersion] = useState(0);
-  const savedCardsRef = useRef(savedCards);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Keep the ref updated with latest saved cards
-  savedCardsRef.current = savedCards;
-
-  // Function to apply pending movements to cards
-  const applyPendingMovements = useCallback(
-    (cards) => {
-      if (!binderId || !cards.length) {
-        return cards;
-      }
-
-      const pendingMoves = getPendingCardMoves(binderId);
-      const pendingPageMoves = getPendingPageMoves(binderId);
-
-      if (pendingMoves.length === 0 && pendingPageMoves.length === 0) {
-        return cards;
-      }
-
-      return cards.map((card) => {
-        // First apply individual card moves
-        let updatedCard = card;
-        const pendingMove = pendingMoves.find(
-          (move) => move.cardId === card.id
-        );
-
-        if (pendingMove) {
-          updatedCard = {
-            ...updatedCard,
-            pageNumber: pendingMove.toPosition.pageNumber,
-            slotInPage: pendingMove.toPosition.slotInPage,
-            overallSlotNumber: pendingMove.toPosition.overallSlotNumber,
-            isPendingMove: true,
-          };
-        }
-
-        // Then apply page moves (if card is affected by any page move)
-        pendingPageMoves.forEach((pageMove) => {
-          const affectedCard = pageMove.affectedCards.find(
-            (affected) => affected.cardId === updatedCard.id
-          );
-          if (affectedCard) {
-            updatedCard = {
-              ...updatedCard,
-              pageNumber: affectedCard.toPageNumber,
-              slotInPage: affectedCard.toSlotInPage,
-              overallSlotNumber: affectedCard.toOverallSlotNumber,
-              isPendingMove: true,
-            };
-          }
-        });
-
-        return updatedCard;
-      });
-    },
-    [binderId]
-  );
-
-  // Update local cards when pending moves change
+  // Initialize local state when Firebase data loads for the first time
   useEffect(() => {
-    const currentSavedCards = savedCardsRef.current;
-    console.log(
-      "useLocalCardState: updating with",
-      currentSavedCards.length,
-      "saved cards, version:",
-      pendingMovesVersion
+    if (!binderId) return;
+
+    // Initialize from Firebase data if needed
+    const localState = initializeLocalBinderState(
+      binderId,
+      firebaseCards,
+      preferences
     );
-    const updatedCards = applyPendingMovements(currentSavedCards);
-    console.log(
-      "useLocalCardState: after applying movements:",
-      updatedCards.length,
-      "cards"
-    );
-    setLocalCards(updatedCards);
-  }, [applyPendingMovements, pendingMovesVersion]); // Removed savedCards
 
-  // Separate effect to handle when savedCards actually loads for the first time
-  useEffect(() => {
-    const currentSavedCards = savedCardsRef.current;
+    // Set local cards from local storage
+    setLocalCards(localState.cards || []);
+  }, [binderId, firebaseCards.length, preferences]); // Only depend on length to avoid infinite loops
 
-    // Only update if we have actual cards and current local cards is empty
-    if (currentSavedCards.length > 0 && localCards.length === 0) {
-      console.log(
-        "useLocalCardState: initial load detected, applying",
-        currentSavedCards.length,
-        "cards"
-      );
-      const updatedCards = applyPendingMovements(currentSavedCards);
-      setLocalCards(updatedCards);
-    }
-  }, [savedCards.length, applyPendingMovements, localCards.length]); // Depend on length, not the array itself
-
-  // Function to manually trigger update (used by event listeners)
+  // Function to refresh local cards from local storage
   const refreshLocalCards = useCallback(() => {
     if (!binderId) return;
 
-    // Increment version to force re-render
-    setPendingMovesVersion((prev) => prev + 1);
+    console.log("Refreshing local cards for binderId:", binderId);
+    const allCards = getAllLocalCards(binderId);
+    console.log("Got cards from local storage:", allCards.length);
+    setLocalCards(allCards);
+    setRefreshTrigger((prev) => prev + 1);
   }, [binderId]);
 
-  // Listen for storage events and custom card move events to update when new movements are added
+  // Listen for storage events to update when local storage changes
   useEffect(() => {
     if (!binderId) return;
 
     const handleStorageChange = (event) => {
-      if (event.key === `pokemon_binder_pending_${binderId}`) {
+      if (event.key?.includes(`pokemon_binder_${binderId}`)) {
         refreshLocalCards();
       }
     };
 
-    const handleCardMoved = (event) => {
-      if (event.detail.binderId === binderId) {
+    const handleLocalBinderUpdate = (event) => {
+      console.log("LocalBinderUpdate event received:", {
+        eventBinderId: event.detail?.binderId,
+        currentBinderId: binderId,
+        eventType: event.detail?.type,
+      });
+
+      if (event.detail?.binderId === binderId) {
+        console.log("Event matches binderId, refreshing local cards...");
+
+        // Force immediate refresh for revert events
+        if (event.detail?.type === "revert") {
+          console.log("Revert event detected, forcing immediate state update");
+
+          // Get fresh data immediately
+          const freshCards = getAllLocalCards(binderId);
+          console.log("Setting fresh cards from revert:", freshCards.length);
+          setLocalCards(freshCards);
+          setRefreshTrigger((prev) => prev + 1);
+        }
+
         refreshLocalCards();
+      } else {
+        console.log("Event binderId does not match, ignoring");
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("cardMoved", handleCardMoved);
+    window.addEventListener("localBinderUpdate", handleLocalBinderUpdate);
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("cardMoved", handleCardMoved);
+      window.removeEventListener("localBinderUpdate", handleLocalBinderUpdate);
     };
   }, [binderId, refreshLocalCards]);
 
-  // Get cards for a specific page with local movements applied
+  // Get cards for a specific page - always fetch fresh to ensure updates
   const getCardsForPage = useCallback(
     (pageNumber) => {
-      return localCards.filter((card) => card.pageNumber === pageNumber);
+      const cards = getLocalCardsForPage(binderId, pageNumber);
+      return cards;
     },
-    [localCards]
+    [binderId, refreshTrigger] // Include refreshTrigger to ensure updates
   );
 
   // Check if a card is in a specific slot
   const getCardInSlot = useCallback(
     (pageNumber, slotInPage) => {
-      return (
-        localCards.find(
-          (card) =>
-            card.pageNumber === pageNumber && card.slotInPage === slotInPage
-        ) || null
-      );
+      const cards = getLocalCardsForPage(binderId, pageNumber);
+      return cards.find((card) => card.slotInPage === slotInPage) || null;
     },
-    [localCards]
+    [binderId, refreshTrigger]
   );
 
-  // Immediately update local state when a move happens (optimistic update)
-  const applyLocalMove = useCallback((sourceCard, targetPosition) => {
-    setLocalCards((prevCards) => {
-      return prevCards.map((card) => {
-        if (card.id === sourceCard.id) {
-          return {
-            ...card,
-            pageNumber: targetPosition.pageNumber,
-            slotInPage: targetPosition.slotInPage,
-            overallSlotNumber: targetPosition.overallSlotNumber,
-            isPendingMove: true,
-          };
-        }
-        return card;
-      });
-    });
-  }, []);
+  // Move a single card immediately in local storage
+  const moveCard = useCallback(
+    (cardId, newPosition) => {
+      const result = moveCardInLocalBinder(binderId, cardId, newPosition);
+      if (result.success) {
+        refreshLocalCards();
 
-  // Immediately update local state for a swap (optimistic update)
-  const applyLocalSwap = useCallback(
-    (sourceCard, targetCard, sourceTarget, targetTarget) => {
-      setLocalCards((prevCards) => {
-        return prevCards.map((card) => {
-          if (card.id === sourceCard.id) {
-            return {
-              ...card,
-              pageNumber: sourceTarget.pageNumber,
-              slotInPage: sourceTarget.slotInPage,
-              overallSlotNumber: sourceTarget.overallSlotNumber,
-              isPendingMove: true,
-            };
-          }
-          if (card.id === targetCard.id) {
-            return {
-              ...card,
-              pageNumber: targetTarget.pageNumber,
-              slotInPage: targetTarget.slotInPage,
-              overallSlotNumber: targetTarget.overallSlotNumber,
-              isPendingMove: true,
-            };
-          }
-          return card;
-        });
-      });
+        // Dispatch custom event for other components
+        window.dispatchEvent(
+          new CustomEvent("localBinderUpdate", {
+            detail: { binderId, type: "cardMove" },
+          })
+        );
+      }
+      return result;
     },
-    []
+    [binderId, refreshLocalCards]
   );
 
-  // Clear all pending movements (called after successful sync)
-  const clearPendingMoves = useCallback(() => {
-    setLocalCards((prevCards) => {
-      return prevCards.map((card) => ({
-        ...card,
-        isPendingMove: false,
-      }));
-    });
-  }, []);
+  // Move multiple cards immediately in local storage (for page reordering)
+  const moveCards = useCallback(
+    (cardUpdates) => {
+      const result = moveCardsInLocalBinder(binderId, cardUpdates);
+      if (result.success) {
+        refreshLocalCards();
+
+        // Dispatch custom event for other components
+        window.dispatchEvent(
+          new CustomEvent("localBinderUpdate", {
+            detail: {
+              binderId,
+              type: "pageMove",
+              updatedCount: result.updatedCount,
+            },
+          })
+        );
+      }
+      return result;
+    },
+    [binderId, refreshLocalCards]
+  );
+
+  // Add cards immediately to local storage
+  const addCards = useCallback(
+    (cardsToAdd) => {
+      const result = addCardsToLocalBinder(binderId, cardsToAdd);
+      if (result.success) {
+        refreshLocalCards();
+
+        // Dispatch custom event for other components
+        window.dispatchEvent(
+          new CustomEvent("localBinderUpdate", {
+            detail: {
+              binderId,
+              type: "cardsAdded",
+              addedCount: result.addedCount,
+            },
+          })
+        );
+      }
+      return result;
+    },
+    [binderId, refreshLocalCards]
+  );
+
+  // Check if changes need syncing
+  const hasUnsyncedChanges = useCallback(() => {
+    return needsSync(binderId);
+  }, [binderId]);
 
   return {
+    // Data
     localCards,
+
+    // Functions
     getCardsForPage,
     getCardInSlot,
-    applyLocalMove,
-    applyLocalSwap,
-    clearPendingMoves,
+    moveCard,
+    moveCards,
+    addCards,
+    refreshLocalCards,
+    hasUnsyncedChanges,
+
+    // State indicators
+    needsSync: hasUnsyncedChanges(),
   };
 };

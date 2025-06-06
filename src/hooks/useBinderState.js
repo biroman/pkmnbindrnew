@@ -102,10 +102,10 @@ export const useBinderState = (binderId, binderPreferences, currentPage) => {
       pageRange.length > 0 &&
       !!binderPreferences &&
       typeof pageCount === "number",
-    staleTime: 1000 * 60 * 5, // **OPTIMIZED**: 5 minutes - aggressive caching
-    gcTime: 1000 * 60 * 10, // **OPTIMIZED**: Keep in cache for 10 minutes
-    refetchOnWindowFocus: false, // **OPTIMIZED**: Don't refetch on window focus
-    refetchOnMount: false, // **OPTIMIZED**: Don't refetch on remount if data exists
+    staleTime: 1000 * 30, // 30 seconds - less aggressive caching for better sync
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: true, // Refetch on window focus to get latest changes
+    refetchOnMount: "always", // Always refetch on mount to ensure fresh data
     // keepPreviousData: true, // Consider for smoother transitions if needed
   });
 

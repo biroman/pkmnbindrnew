@@ -50,28 +50,6 @@ const Profile = () => {
         return <BinderPreferencesSection />;
       case "privacy-sharing":
         return <PrivacySharingSection />;
-      case "display-themes":
-        return (
-          <div className="space-y-6">
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Display & Themes
-              </h1>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Customize appearance and binder themes
-              </p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-              <p className="text-center text-blue-600 dark:text-blue-400">
-                🎨 Theme customization coming soon!
-              </p>
-              <p className="text-center text-sm text-blue-500 dark:text-blue-300 mt-2">
-                Choose custom binder themes, card backgrounds, and visual
-                effects.
-              </p>
-            </div>
-          </div>
-        );
       case "notifications":
         return (
           <div className="space-y-6">

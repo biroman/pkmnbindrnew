@@ -48,6 +48,8 @@ export const createUserProfile = async (userId, userData) => {
       role: userRole,
       totalBinders: 0,
       totalValue: 0,
+      photoURL: userData.photoURL || null,
+      photoPath: null, // Will be set when user uploads custom picture
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
       settings: {
@@ -1310,6 +1312,30 @@ export const validateUserProfileData = (data) => {
     }
     if (!data.email.includes("@") || !data.email.includes(".")) {
       errors.push("Invalid email format");
+    }
+  }
+
+  // Validate photo URL if provided
+  if (data.photoURL !== undefined) {
+    if (data.photoURL !== null && typeof data.photoURL === "string") {
+      if (data.photoURL.length > 1000) {
+        errors.push("Photo URL must be 1000 characters or less");
+      }
+      // Basic URL validation
+      try {
+        new URL(data.photoURL);
+      } catch {
+        errors.push("Invalid photo URL format");
+      }
+    }
+  }
+
+  // Validate photo path if provided (for Firebase Storage cleanup)
+  if (data.photoPath !== undefined) {
+    if (data.photoPath !== null && typeof data.photoPath === "string") {
+      if (data.photoPath.length > 500) {
+        errors.push("Photo path must be 500 characters or less");
+      }
     }
   }
 

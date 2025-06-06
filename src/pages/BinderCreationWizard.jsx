@@ -370,14 +370,14 @@ const BinderCreationWizard = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
+        {/* <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Create New Binder
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Set up your Pokemon card binder in just a few steps
           </p>
-        </div>
+        </div> */}
 
         {/* Limit Warning */}
         {showLimitWarning && (
@@ -520,7 +520,7 @@ const TemplateStep = ({ selected, onSelect }) => {
     <div>
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Choose Your Template
+          Create New Binder
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
           Start with a pre-configured template or build from scratch

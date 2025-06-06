@@ -43,12 +43,7 @@ const AdminSection = ({ currentUser, userProfile, isOwner }) => {
       icon: BarChart3,
       description: "View system statistics and health metrics",
     },
-    {
-      id: "cost-monitoring",
-      name: "Cost Monitoring",
-      icon: DollarSign,
-      description: "Monitor Firebase usage and costs",
-    },
+
     {
       id: "users",
       name: "User Management",

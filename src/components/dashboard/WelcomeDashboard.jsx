@@ -96,33 +96,8 @@ const WelcomeDashboard = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto px-4 mt-16 sm:px-6 lg:px-8">
       <div className="space-y-8">
-        {/* Welcome Header */}
-        <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-2xl shadow-lg p-8 text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">
-                  Welcome back, {displayName}! ⚡
-                </h1>
-                <p className="text-blue-100 text-lg">
-                  Ready to showcase your Pokemon collection?
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-4xl font-bold mb-1">
-                  {totalBinders.toLocaleString()}
-                </div>
-                <div className="text-blue-100 text-sm uppercase tracking-wide">
-                  Total Binders
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Key Statistics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-6 text-center hover:shadow-md transition-shadow">

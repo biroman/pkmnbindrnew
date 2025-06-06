@@ -10,6 +10,7 @@ import {
   getPendingChangesSummary,
   getPendingCardAdditions,
   getPendingCardMoves,
+  getPendingPageMoves,
   hasPendingChanges,
   clearPendingChanges,
   removeCardFromPending,
@@ -167,6 +168,43 @@ export const usePendingChanges = (binderId) => {
         console.log(
           `Successfully batch updated ${result.updatedCount} card movements in Firebase`
         );
+      }
+
+      // Handle page movements by converting them to individual card movements
+      if (pendingData.pageMoves && pendingData.pageMoves.length > 0) {
+        console.log(
+          `Syncing ${pendingData.pageMoves.length} page movements to Firebase`
+        );
+
+        // Convert page moves to individual card movements
+        const allCardMovements = pendingData.pageMoves.flatMap((pageMove) =>
+          pageMove.affectedCards.map((card) => ({
+            cardId: card.cardId,
+            toPosition: {
+              pageNumber: card.toPageNumber,
+              slotInPage: card.toSlotInPage,
+              overallSlotNumber: card.toOverallSlotNumber,
+            },
+          }))
+        );
+
+        if (allCardMovements.length > 0) {
+          const result = await batchUpdateCardMovements(
+            currentUser.uid,
+            binderId,
+            allCardMovements
+          );
+
+          if (!result.success) {
+            throw new Error(
+              result.error || "Failed to update page movements in Firebase"
+            );
+          }
+
+          console.log(
+            `Successfully batch updated ${result.updatedCount} card movements from page moves in Firebase`
+          );
+        }
       }
 
       // TODO: Handle card removals and updates when implemented

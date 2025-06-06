@@ -111,45 +111,6 @@ const SecuritySection = ({
           </p>
         </div>
 
-        {/* Security Overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Shield className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
-              Security Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <Lock className="h-4 w-4 text-green-600 dark:text-green-400 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Password Protected
-                  </p>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Strong password active
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    {isEmailVerified() ? "Email Verified" : "Email Pending"}
-                  </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
-                    {isEmailVerified()
-                      ? "Account verified"
-                      : "Verification needed"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Email Verification - Show if not verified */}
         <EmailVerification
           isEmailVerified={isEmailVerified}
@@ -201,7 +162,7 @@ const SecuritySection = ({
                         <Button
                           variant="destructive"
                           size="sm"
-                          className="flex items-center ml-4 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex items-center ml-4 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white dark:text-white disabled:cursor-not-allowed"
                           disabled={isDeleteRestricted}
                         >
                           <Trash2 className="h-4 w-4 mr-1" />

@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { getPendingCardMoves } from "../utils/localBinderStorage";
+import {
+  getPendingCardMoves,
+  getPendingPageMoves,
+} from "../utils/localBinderStorage";
 
 /**
  * Hook to manage local card state with pending movements
@@ -21,19 +24,22 @@ export const useLocalCardState = (savedCards = [], binderId) => {
       }
 
       const pendingMoves = getPendingCardMoves(binderId);
+      const pendingPageMoves = getPendingPageMoves(binderId);
 
-      if (pendingMoves.length === 0) {
+      if (pendingMoves.length === 0 && pendingPageMoves.length === 0) {
         return cards;
       }
 
       return cards.map((card) => {
+        // First apply individual card moves
+        let updatedCard = card;
         const pendingMove = pendingMoves.find(
           (move) => move.cardId === card.id
         );
 
         if (pendingMove) {
-          return {
-            ...card,
+          updatedCard = {
+            ...updatedCard,
             pageNumber: pendingMove.toPosition.pageNumber,
             slotInPage: pendingMove.toPosition.slotInPage,
             overallSlotNumber: pendingMove.toPosition.overallSlotNumber,
@@ -41,7 +47,23 @@ export const useLocalCardState = (savedCards = [], binderId) => {
           };
         }
 
-        return card;
+        // Then apply page moves (if card is affected by any page move)
+        pendingPageMoves.forEach((pageMove) => {
+          const affectedCard = pageMove.affectedCards.find(
+            (affected) => affected.cardId === updatedCard.id
+          );
+          if (affectedCard) {
+            updatedCard = {
+              ...updatedCard,
+              pageNumber: affectedCard.toPageNumber,
+              slotInPage: affectedCard.toSlotInPage,
+              overallSlotNumber: affectedCard.toOverallSlotNumber,
+              isPendingMove: true,
+            };
+          }
+        });
+
+        return updatedCard;
       });
     },
     [binderId]

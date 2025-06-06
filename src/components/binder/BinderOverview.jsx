@@ -18,6 +18,8 @@ const BinderOverview = ({
   currentPageNumber,
   // onPageClick, // For future navigation
   onPageReorder,
+  allCards = [], // All cards in the binder for generating previews
+  gridSize = "3x3", // Grid size for layout calculations
 }) => {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -62,6 +64,8 @@ const BinderOverview = ({
                 id={page.id}
                 pageNumber={page.number}
                 isActive={page.number === currentPageNumber}
+                cards={allCards}
+                gridSize={gridSize}
                 // onClick={() => onPageClick(page.number)} // For future navigation
               />
             ))}

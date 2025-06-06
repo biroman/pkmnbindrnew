@@ -35,6 +35,13 @@ service cloud.firestore {
              request.time > resource.data.updatedAt + duration.value(1, 's');
     }
 
+    // Helper function for display name change rate limiting
+    function displayNameChangeAllowed() {
+      // Allow if no previous displayNameLastChangedAt or if it's been more than 150 seconds (2.5 minutes)
+      return !('displayNameLastChangedAt' in resource.data) || 
+             request.time > resource.data.displayNameLastChangedAt + duration.value(150, 's');
+    }
+
     // System Monitoring - only owners can write, read restricted
     match /systemMonitoring/{docId} {
       allow read: if isOwner();
@@ -57,15 +64,26 @@ service cloud.firestore {
       allow update: if request.auth != null && 
                        request.auth.uid == userId &&
                        !isEmergencyMode() &&
-                       // Validate displayName length (max 50 chars)
+                       // Display name change rate limiting and validation
                        (!('displayName' in resource.data) || 
                         !('displayName' in request.resource.data) ||
-                        isValidStringLength(request.resource.data.displayName, 50)) &&
+                        (isValidStringLength(request.resource.data.displayName, 50) &&
+                         // If displayName is being changed, check rate limit
+                         (resource.data.displayName == request.resource.data.displayName || displayNameChangeAllowed()))) &&
                        // Validate email format (basic check)
                        (!('email' in resource.data) || 
                         !('email' in request.resource.data) ||
                         (isValidStringLength(request.resource.data.email, 100) && 
                          request.resource.data.email.matches('.*@.*\\..*'))) &&
+                       // Validate photoURL (max 1000 chars, must be valid URL or null)
+                       (!('photoURL' in request.resource.data) ||
+                        request.resource.data.photoURL == null ||
+                        (isValidStringLength(request.resource.data.photoURL, 1000) &&
+                         request.resource.data.photoURL.matches('https?://.*'))) &&
+                       // Validate photoPath (max 500 chars or null)
+                       (!('photoPath' in request.resource.data) ||
+                        request.resource.data.photoPath == null ||
+                        isValidStringLength(request.resource.data.photoPath, 500)) &&
                        // Validate role cannot be changed by user
                        (resource.data.role == request.resource.data.role);
     }

@@ -83,52 +83,17 @@ const Binder = () => {
   // Effect to initialize/update displayPages for drag-and-drop
   useEffect(() => {
     if (preferences?.pageCount > 0) {
-      let newPagesSetup = Array.from(
-        { length: preferences.pageCount },
-        (_, i) => ({
-          id: `page-${i + 1}`, // Corresponds to the original page number
-          number: i + 1, // Default display number, will be updated by saved order
-        })
-      );
+      // Simple sequential page setup - no complex ordering needed
+      const pages = Array.from({ length: preferences.pageCount }, (_, i) => ({
+        id: `page-${i + 1}`,
+        number: i + 1,
+      }));
 
-      if (
-        preferences.orderedPageOriginalNumbers &&
-        Array.isArray(preferences.orderedPageOriginalNumbers) &&
-        preferences.orderedPageOriginalNumbers.length === preferences.pageCount
-      ) {
-        // We have a saved order, let's apply it.
-        // Create a map for quick lookup of pages by their original number (id)
-        const pagesById = newPagesSetup.reduce((acc, page) => {
-          acc[page.id] = page;
-          return acc;
-        }, {});
-
-        // Reconstruct newPagesSetup based on the saved order
-        const sortedPages = preferences.orderedPageOriginalNumbers
-          .map((originalNumber) => {
-            return pagesById[`page-${originalNumber}`];
-          })
-          .filter(Boolean); // Filter out any potential undefined if IDs mismatch
-
-        if (sortedPages.length === preferences.pageCount) {
-          newPagesSetup = sortedPages;
-        }
-      }
-
-      // After establishing the correct order (either default or from saved preferences),
-      // assign the final visual 'number' for display.
-      const finalPagesWithCorrectDisplayNumber = newPagesSetup.map(
-        (page, index) => ({
-          ...page,
-          number: index + 1, // This is the number shown on the thumbnail
-        })
-      );
-
-      setDisplayPages(finalPagesWithCorrectDisplayNumber);
+      setDisplayPages(pages);
     } else {
       setDisplayPages([]);
     }
-  }, [preferences?.pageCount, preferences?.orderedPageOriginalNumbers]); // Depend on saved order
+  }, [preferences?.pageCount]); // Only depend on page count
 
   // Custom hooks for responsive behavior
   const windowSize = useWindowSize();
@@ -200,43 +165,97 @@ const Binder = () => {
 
   // Function to handle page reordering from BinderOverview
   const handlePageReorder = ({ oldIndex, newIndex }) => {
+    console.log(`Reordering page from index ${oldIndex} to ${newIndex}`);
+
+    // Simple approach: Update the display pages and move cards to match new page numbers
     setDisplayPages((currentPages) => {
       const movedPagesArray = arrayMove(currentPages, oldIndex, newIndex);
-      const finalPageOrder = movedPagesArray.map((page, index) => ({
-        ...page,
-        number: index + 1, // This 'number' is what PageThumbnail displays
-      }));
 
-      // Prepare the order of original page numbers for saving
-      // e.g., if page with id 'page-5' is now first, this will be 5
-      const originalPageNumbersInNewOrder = finalPageOrder.map((p) =>
-        parseInt(p.id.split("-")[1])
-      );
-
-      console.log(
-        "Staging new page order for preferences:",
-        originalPageNumbersInNewOrder
-      );
-      updatePreferences({
-        orderedPageOriginalNumbers: originalPageNumbersInNewOrder,
+      // Create a simple mapping: old position -> new position
+      const positionMapping = new Map();
+      movedPagesArray.forEach((page, newIndex) => {
+        const originalPosition = parseInt(page.id.split("-")[1]);
+        const newPosition = newIndex + 1;
+        positionMapping.set(originalPosition, newPosition);
       });
 
-      // Regarding saving to Firebase:
-      // updatePreferences likely marks the state as 'isDirty'.
-      // The actual save (calling savePreferences()) can happen in a few ways:
-      // 1. User explicitly saves (e.g., Ctrl+S, a save button, which should check isDirty).
-      // 2. Autosave: If you have an autosave mechanism, it would pick up the 'isDirty' state.
-      // 3. Immediate save after this operation: You could call savePreferences() here directly.
-      //    However, calling it on every micro-interaction of a drag might be too frequent.
-      //    A common pattern is to save when the drag operation *concludes* or after a brief debounce period.
-      //    For now, we'll rely on the existing save mechanisms triggered by 'isDirty'.
-      //    If you need to force an immediate save upon reorder completion, you could:
-      //    setTimeout(() => savePreferences(), 100); // Example: save shortly after reorder logic completes
+      console.log("Position mapping:", Array.from(positionMapping.entries()));
 
-      return finalPageOrder;
+      // Move all cards to their new page numbers - use localCards which includes pending moves
+      if (localCardState.localCards && localCardState.localCards.length > 0) {
+        const cardsToMove = [];
+
+        localCardState.localCards.forEach((card) => {
+          const newPageNumber = positionMapping.get(card.pageNumber);
+          if (newPageNumber && newPageNumber !== card.pageNumber) {
+            cardsToMove.push({
+              cardId: card.id,
+              cardName: card.name || `Card ${card.number}`,
+              fromPageNumber: card.pageNumber,
+              fromSlotInPage: card.slotInPage,
+              fromOverallSlotNumber: card.overallSlotNumber,
+              toPageNumber: newPageNumber,
+              toSlotInPage: card.slotInPage,
+              toOverallSlotNumber:
+                (newPageNumber - 1) * binderState.slotsPerPage +
+                card.slotInPage,
+              moveType: "move",
+            });
+          }
+        });
+
+        console.log(`Moving ${cardsToMove.length} cards due to page reorder`);
+
+        // Add page move as a single operation instead of individual card moves
+        if (cardsToMove.length > 0) {
+          import("../utils/localBinderStorage").then(
+            ({
+              addPageMoveToPending,
+              getPendingChangesSummary,
+              clearPendingChanges,
+            }) => {
+              console.log(
+                "Before adding page move:",
+                getPendingChangesSummary(binderId)
+              );
+
+              // Clear any existing pending changes to ensure clean state
+              clearPendingChanges(binderId);
+
+              addPageMoveToPending(binderId, {
+                fromPagePosition: oldIndex + 1,
+                toPagePosition: newIndex + 1,
+                affectedCards: cardsToMove.map((card) => ({
+                  cardId: card.cardId,
+                  cardName: card.cardName,
+                  toPageNumber: card.toPageNumber,
+                  toSlotInPage: card.toSlotInPage,
+                  toOverallSlotNumber: card.toOverallSlotNumber,
+                })),
+              });
+
+              console.log(
+                "After adding page move:",
+                getPendingChangesSummary(binderId)
+              );
+
+              // Trigger UI update for immediate card position changes
+              window.dispatchEvent(
+                new StorageEvent("storage", {
+                  key: `pokemon_binder_pending_${binderId}`,
+                })
+              );
+            }
+          );
+        }
+      }
+
+      // Return simple page structure - no complex ordering needed
+      return movedPagesArray.map((page, index) => ({
+        id: `page-${index + 1}`, // Simple sequential IDs
+        number: index + 1,
+      }));
     });
-    // If you decide an immediate save is best after a reorder operation completes (outside the setDisplayPages callback):
-    // savePreferences(); // Ensure this is what you want, as it writes to DB on each completed drag.
   };
 
   // Function to handle adding cards - opens the modal
@@ -504,6 +523,8 @@ const Binder = () => {
             pages={displayPages}
             currentPageNumber={currentPage}
             onPageReorder={handlePageReorder}
+            allCards={localCardState.localCards}
+            gridSize={preferences.gridSize}
           />
         ) : (
           <BinderSpread

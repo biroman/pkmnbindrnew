@@ -79,6 +79,7 @@ export const addCardsToPending = (binderId, cardsWithSlots) => {
     removedCardIds: [],
     updatedCards: [],
     movedCards: [], // Track card movements
+    pageMoves: [], // Track page movements as single operations
   };
 
   // Process each card to add with slot assignment
@@ -144,7 +145,8 @@ export const getPendingChangesCount = (binderId) => {
     (changes.addedCards?.length || 0) +
     (changes.removedCardIds?.length || 0) +
     (changes.updatedCards?.length || 0) +
-    (changes.movedCards?.length || 0)
+    (changes.movedCards?.length || 0) +
+    (changes.pageMoves?.length || 0)
   );
 };
 
@@ -164,6 +166,36 @@ export const getPendingCardAdditions = (binderId) => {
 };
 
 /**
+ * Add a page movement to pending changes (counts as 1 change instead of many card movements)
+ */
+export const addPageMoveToPending = (binderId, pageMoveData) => {
+  const existing = getPendingChanges(binderId) || {
+    addedCards: [],
+    removedCardIds: [],
+    updatedCards: [],
+    movedCards: [],
+    pageMoves: [],
+  };
+
+  const pageMoveEntry = {
+    moveId: `pageMove_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    fromPagePosition: pageMoveData.fromPagePosition,
+    toPagePosition: pageMoveData.toPagePosition,
+    affectedCards: pageMoveData.affectedCards, // Array of cards that will be moved
+    timestamp: new Date().toISOString(),
+    description: `Move page ${pageMoveData.fromPagePosition} to position ${pageMoveData.toPagePosition}`,
+  };
+
+  const updated = {
+    ...existing,
+    pageMoves: [...existing.pageMoves, pageMoveEntry],
+  };
+
+  savePendingChanges(binderId, updated);
+  return { success: true, moveId: pageMoveEntry.moveId };
+};
+
+/**
  * Add a card movement to pending changes
  */
 export const addCardMoveToPending = (binderId, moveData) => {
@@ -172,6 +204,7 @@ export const addCardMoveToPending = (binderId, moveData) => {
     removedCardIds: [],
     updatedCards: [],
     movedCards: [],
+    pageMoves: [],
   };
 
   // Check if this card already has a pending movement
@@ -266,6 +299,14 @@ export const getPendingCardMoves = (binderId) => {
 };
 
 /**
+ * Get all pending page moves
+ */
+export const getPendingPageMoves = (binderId) => {
+  const changes = getPendingChanges(binderId);
+  return changes?.pageMoves || [];
+};
+
+/**
  * Clear a specific card movement from pending changes
  */
 export const removeCardMoveFromPending = (binderId, moveId) => {
@@ -292,6 +333,7 @@ export const getPendingChangesSummary = (binderId) => {
       removedCards: 0,
       updatedCards: 0,
       movedCards: 0,
+      pageMoves: 0,
     };
   }
 
@@ -299,13 +341,16 @@ export const getPendingChangesSummary = (binderId) => {
   const removedCards = changes.removedCardIds?.length || 0;
   const updatedCards = changes.updatedCards?.length || 0;
   const movedCards = changes.movedCards?.length || 0;
+  const pageMoves = changes.pageMoves?.length || 0;
 
   return {
-    totalChanges: addedCards + removedCards + updatedCards + movedCards,
+    totalChanges:
+      addedCards + removedCards + updatedCards + movedCards + pageMoves,
     addedCards,
     removedCards,
     updatedCards,
     movedCards,
+    pageMoves,
     lastModified: changes.lastModified,
   };
 };

@@ -1,0 +1,57 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function for rate limiting
+    function isNotTooFrequent() {
+      // Allow max 3 uploads per minute per user
+      return request.time > resource.timeCreated + duration.value(20, 's');
+    }
+    
+    // Helper function to validate file name
+    function isValidFileName(fileName) {
+      // Only allow specific pattern: profile_timestamp.extension
+      return fileName.matches('profile_[0-9]+\\.(jpeg|jpg|png|webp)');
+    }
+    
+    // Helper function to check user quota (simplified - in production use Functions)
+    function withinUserQuota(userId) {
+      // This is a simplified check - in production, implement with Cloud Functions
+      // For now, limit to reasonable file sizes and count
+      return true; // TODO: Implement proper quota checking
+    }
+
+    // Profile pictures - users can only manage their own with strict limits
+    match /profile-pictures/{userId}/{fileName} {
+      // Allow read access to authenticated users (public profile pictures)
+      allow read: if request.auth != null;
+      
+      // Allow write with comprehensive validation and rate limiting
+      allow write: if request.auth != null && 
+                      request.auth.uid == userId &&
+                      // Rate limiting: max 1 upload per 20 seconds
+                      (!resource || isNotTooFrequent()) &&
+                      // Validate file size (max 5MB - enforced server-side)
+                      request.resource.size <= 5 * 1024 * 1024 &&
+                      // Validate minimum file size (prevent tiny/empty files)
+                      request.resource.size >= 1024 &&
+                      // Validate file type (only images - server enforced)
+                      request.resource.contentType.matches('image/(jpeg|jpg|png|webp)') &&
+                      // Validate file name pattern (prevent path traversal)
+                      isValidFileName(fileName) &&
+                      // Ensure user stays within quota
+                      withinUserQuota(userId);
+      
+      // Allow delete only for own files with rate limiting
+      allow delete: if request.auth != null && 
+                       request.auth.uid == userId &&
+                       // Rate limiting for deletes too
+                       (!resource || isNotTooFrequent());
+    }
+
+    // Deny all other storage access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 

@@ -8,6 +8,7 @@ import {
   Users,
   Globe,
   Lock,
+  Construction,
 } from "lucide-react";
 import {
   Card,
@@ -77,6 +78,16 @@ const PrivacySharingSection = () => {
           </p>
         </div>
 
+        {/* Coming Soon Banner */}
+        <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+          <Construction className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <strong>Coming Soon!</strong> Privacy and sharing features are
+            currently under development. These settings will be available in an
+            upcoming update.
+          </AlertDescription>
+        </Alert>
+
         {alert && (
           <Alert variant={alert.type === "error" ? "destructive" : "success"}>
             <AlertDescription>{alert.message}</AlertDescription>
@@ -84,16 +95,23 @@ const PrivacySharingSection = () => {
         )}
 
         {/* Default Visibility Settings */}
-        <Card>
+        <Card className="opacity-60">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
-              Default Visibility Settings
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                Default Visibility Settings
+              </div>
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-medium">
+                Coming Soon
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <FormField>
-              <Label>Default Binder Visibility</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Default Binder Visibility
+              </Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Select
@@ -101,8 +119,9 @@ const PrivacySharingSection = () => {
                     onValueChange={(value) =>
                       updateSetting("defaultVisibility", value)
                     }
+                    disabled={true}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                       <SelectValue placeholder="Choose visibility..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -129,15 +148,17 @@ const PrivacySharingSection = () => {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
-                    How new binders are visible by default. You can change this
-                    for individual binders.
+                    Feature coming soon! This will control how new binders are
+                    visible by default.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </FormField>
 
             <FormField>
-              <Label>Allow Public Discovery</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Allow Public Discovery
+              </Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Select
@@ -145,8 +166,9 @@ const PrivacySharingSection = () => {
                     onValueChange={(value) =>
                       updateSetting("allowPublicDiscovery", value === "allow")
                     }
+                    disabled={true}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -161,8 +183,8 @@ const PrivacySharingSection = () => {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
-                    Whether your public binders appear in search results and
-                    featured collections
+                    Feature coming soon! This will control whether your public
+                    binders appear in search results.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -171,16 +193,23 @@ const PrivacySharingSection = () => {
         </Card>
 
         {/* Link Sharing Settings */}
-        <Card>
+        <Card className="opacity-60">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Link className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
-              Link Sharing Settings
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Link className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
+                Link Sharing Settings
+              </div>
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-medium">
+                Coming Soon
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField>
-              <Label>Default Link Expiration</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Default Link Expiration
+              </Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Select
@@ -188,8 +217,9 @@ const PrivacySharingSection = () => {
                     onValueChange={(value) =>
                       updateSetting("linkExpiration", value)
                     }
+                    disabled={true}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                       <SelectValue placeholder="Choose expiration..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -203,20 +233,26 @@ const PrivacySharingSection = () => {
                   </Select>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>How long shared links remain active by default</p>
+                  <p>
+                    Feature coming soon! This will control how long shared links
+                    remain active.
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </FormField>
 
             <FormField>
-              <Label>Require Email for Viewing</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Require Email for Viewing
+              </Label>
               <Select
                 value={settings.requireEmailForView ? "require" : "allow"}
                 onValueChange={(value) =>
                   updateSetting("requireEmailForView", value === "require")
                 }
+                disabled={true}
               >
-                <SelectTrigger>
+                <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,16 +267,23 @@ const PrivacySharingSection = () => {
         </Card>
 
         {/* Interaction Settings */}
-        <Card>
+        <Card className="opacity-60">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2" />
-              Viewer Interaction Settings
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2" />
+                Viewer Interaction Settings
+              </div>
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-medium">
+                Coming Soon
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField>
-              <Label>Allow Comments</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Allow Comments
+              </Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Select
@@ -248,8 +291,9 @@ const PrivacySharingSection = () => {
                     onValueChange={(value) =>
                       updateSetting("allowComments", value === "allow")
                     }
+                    disabled={true}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -262,14 +306,17 @@ const PrivacySharingSection = () => {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
-                    Whether viewers can leave comments on your shared binders
+                    Feature coming soon! This will control whether viewers can
+                    leave comments.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </FormField>
 
             <FormField>
-              <Label>Allow Copying/Downloading</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Allow Copying/Downloading
+              </Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Select
@@ -277,8 +324,9 @@ const PrivacySharingSection = () => {
                     onValueChange={(value) =>
                       updateSetting("allowCopy", value === "allow")
                     }
+                    disabled={true}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -293,22 +341,25 @@ const PrivacySharingSection = () => {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
-                    Whether viewers can copy your binder as a template or export
-                    the card list
+                    Feature coming soon! This will control whether viewers can
+                    copy your binder data.
                   </p>
                 </TooltipContent>
               </Tooltip>
             </FormField>
 
             <FormField>
-              <Label>Show Owner Information</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                Show Owner Information
+              </Label>
               <Select
                 value={settings.showOwnerInfo ? "show" : "hide"}
                 onValueChange={(value) =>
                   updateSetting("showOwnerInfo", value === "show")
                 }
+                disabled={true}
               >
-                <SelectTrigger>
+                <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -321,7 +372,9 @@ const PrivacySharingSection = () => {
             </FormField>
 
             <FormField>
-              <Label>View Analytics</Label>
+              <Label className="text-gray-400 dark:text-gray-500">
+                View Analytics
+              </Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Select
@@ -329,8 +382,9 @@ const PrivacySharingSection = () => {
                     onValueChange={(value) =>
                       updateSetting("allowAnalytics", value === "enable")
                     }
+                    disabled={true}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -345,8 +399,8 @@ const PrivacySharingSection = () => {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
-                    Whether to track how many times your binders are viewed and
-                    by whom
+                    Feature coming soon! This will control whether to track
+                    binder views and analytics.
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -355,37 +409,29 @@ const PrivacySharingSection = () => {
         </Card>
 
         {/* Privacy Overview */}
-        <Card className="border-blue-200 dark:border-blue-800">
+        <Card className="border-blue-200 dark:border-blue-800 opacity-60">
           <CardHeader>
-            <CardTitle className="flex items-center text-blue-600 dark:text-blue-400">
-              <Eye className="h-5 w-5 mr-2" />
-              Privacy Summary
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center text-blue-600 dark:text-blue-400">
+                <Eye className="h-5 w-5 mr-2" />
+                Privacy Summary
+              </div>
+              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full font-medium">
+                Coming Soon
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
               <div className="space-y-2 text-sm">
-                <p className="font-medium text-blue-800 dark:text-blue-200">
-                  Current Privacy Level:{" "}
-                  {settings.defaultVisibility === "private"
-                    ? "High"
-                    : settings.defaultVisibility === "unlisted"
-                    ? "Medium"
-                    : "Low"}
+                <p className="font-medium text-gray-500 dark:text-gray-400">
+                  Privacy settings will be displayed here once implemented.
                 </p>
-                <ul className="text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>
-                    • New binders are {settings.defaultVisibility} by default
-                  </li>
-                  <li>
-                    • Public discovery is{" "}
-                    {settings.allowPublicDiscovery ? "enabled" : "disabled"}
-                  </li>
-                  <li>
-                    • Comments are{" "}
-                    {settings.allowComments ? "allowed" : "disabled"}
-                  </li>
-                  <li>• Link expiration: {settings.linkExpiration}</li>
+                <ul className="text-gray-400 dark:text-gray-500 space-y-1">
+                  <li>• Default visibility controls</li>
+                  <li>• Public discovery preferences</li>
+                  <li>• Comment and interaction settings</li>
+                  <li>• Link sharing configurations</li>
                 </ul>
               </div>
             </div>
@@ -394,14 +440,22 @@ const PrivacySharingSection = () => {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button
-            onClick={handleSaveSettings}
-            loading={isLoading}
-            className="flex items-center"
-          >
-            <Share2 className="h-4 w-4 mr-2" />
-            Save Privacy Settings
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleSaveSettings}
+                loading={isLoading}
+                className="flex items-center cursor-not-allowed opacity-50"
+                disabled={true}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Save Privacy Settings
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Privacy settings are coming soon and cannot be saved yet.</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </TooltipProvider>

@@ -44,12 +44,6 @@ const SettingsNavigation = ({ activeSection, onSectionChange, isOwner }) => {
       icon: Share2,
     },
     {
-      id: "display-themes",
-      name: "Display & Themes",
-      description: "Customize appearance and binder themes",
-      icon: Image,
-    },
-    {
       id: "notifications",
       name: "Notifications",
       description: "Email and in-app notification preferences",

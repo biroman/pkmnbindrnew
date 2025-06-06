@@ -323,6 +323,15 @@ const Header = () => {
                       </span>
                     </div>
                   )}
+                  <p
+                    className={`text-sm font-bold ${
+                      isOwner()
+                        ? "text-purple-600 dark:text-purple-400"
+                        : "text-gray-900 dark:text-white"
+                    }`}
+                  >
+                    {displayName}
+                  </p>
                   {/* Dropdown indicator - hidden on mobile */}
                   <ChevronDown
                     className={`hidden sm:block h-4 w-4 text-gray-500 dark:text-gray-400 transition-transform ${

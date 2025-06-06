@@ -194,11 +194,24 @@ export const initializeLocalBinderState = (
       })),
     });
 
+    // Preserve existing local preferences and merge with Firebase preferences
+    const preservedPreferences = {
+      ...(localState?.preferences || {}), // Existing local preferences
+      ...preferences, // Firebase preferences (may be empty during reinitialization)
+    };
+
+    console.log("Preference preservation during merge:", {
+      existingLocalPrefs: localState?.preferences || {},
+      incomingFirebasePrefs: preferences,
+      preservedPreferences,
+      showReverseHolosPreserved: preservedPreferences.showReverseHolos,
+    });
+
     const updatedState = {
       version: STORAGE_VERSION,
       binderId,
       cards: mergedCards,
-      preferences: { ...(localState?.preferences || {}), ...preferences },
+      preferences: preservedPreferences,
       lastModified: new Date().toISOString(),
     };
 
@@ -216,11 +229,25 @@ export const initializeLocalBinderState = (
   if (!hasLocalChanges && hasFirebaseCards) {
     console.log("No local changes detected, updating with fresh Firebase data");
 
+    // Preserve existing local preferences and merge with Firebase preferences
+    // This prevents preferences from being reset during sync cycles
+    const preservedPreferences = {
+      ...(localState?.preferences || {}), // Existing local preferences
+      ...preferences, // Firebase preferences (may be empty during reinitialization)
+    };
+
+    console.log("Preference preservation during reinitialization:", {
+      existingLocalPrefs: localState?.preferences || {},
+      incomingFirebasePrefs: preferences,
+      preservedPreferences,
+      showReverseHolosPreserved: preservedPreferences.showReverseHolos,
+    });
+
     const updatedState = {
       version: STORAGE_VERSION,
       binderId,
       cards: firebaseCards,
-      preferences: { ...(localState?.preferences || {}), ...preferences },
+      preferences: preservedPreferences,
       lastModified: new Date().toISOString(),
     };
 

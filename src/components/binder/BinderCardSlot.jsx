@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Star } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useParams } from "react-router-dom";
 import { getPageAndSlotFromSlotNumber } from "../../utils/slotAssignment";
@@ -90,7 +90,14 @@ const BinderCardSlot = ({
           </span>
         </div>
 
-        {/* No more pending indicator needed in new system */}
+        {/* Reverse Holo Indicator */}
+        {(cardData.isReverseHolo || displayCard.isReverseHolo) && (
+          <div className="absolute top-2 right-2">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg">
+              <Star className="w-3 h-3 text-white" />
+            </div>
+          </div>
+        )}
 
         {/* Card info overlay on hover */}
         <div className="absolute inset-0 bg-black/0 hover:bg-black/80 transition-all duration-200 rounded-lg opacity-0 hover:opacity-100 flex flex-col items-center justify-center text-white p-2 text-center">
@@ -103,6 +110,12 @@ const BinderCardSlot = ({
           <span className="text-xs text-gray-300">#{cardData.number}</span>
           {cardData.rarity && (
             <span className="text-xs text-gray-300">{cardData.rarity}</span>
+          )}
+          {(cardData.isReverseHolo || displayCard.isReverseHolo) && (
+            <div className="flex items-center gap-1 mt-1">
+              <Star className="w-3 h-3 text-yellow-400" />
+              <span className="text-xs text-yellow-400">Reverse Holo</span>
+            </div>
           )}
         </div>
       </div>

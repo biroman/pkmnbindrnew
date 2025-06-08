@@ -71,6 +71,7 @@ const Binder = () => {
   const [isOverviewModeActive, setIsOverviewModeActive] = useState(false);
   const [displayPages, setDisplayPages] = useState([]);
   const [isAddCardsModalOpen, setIsAddCardsModalOpen] = useState(false);
+  const [targetSlot, setTargetSlot] = useState(null);
 
   // Sync local binderName with fetched binder name from preferences
   // This effect also handles the initial setting of binderName
@@ -219,7 +220,8 @@ const Binder = () => {
   };
 
   // Function to handle adding cards - opens the modal
-  const handleAddCards = () => {
+  const handleAddCards = (targetSlot = null) => {
+    setTargetSlot(targetSlot); // Store the clicked slot
     setIsAddCardsModalOpen(true);
   };
 
@@ -491,8 +493,16 @@ const Binder = () => {
             isAtPageLimit={isAtPageLimit}
             limitReason={limitReason}
             maxPages={maxPages}
-            cardsOnPage1={localCardState.getCardsForPage(currentPage)}
-            cardsOnPage2={localCardState.getCardsForPage(currentPage + 1)}
+            cardsOnPage1={
+              currentPage === 1
+                ? localCardState.getCardsForPage(1)
+                : localCardState.getCardsForPage((currentPage - 1) * 2)
+            }
+            cardsOnPage2={
+              currentPage === 1
+                ? [] // First spread has empty cover page on left
+                : localCardState.getCardsForPage((currentPage - 1) * 2 + 1)
+            }
             allCards={localCardState.localCards}
             onCardMove={handleCardMove}
             isDragEnabled={!isOverviewModeActive}
@@ -505,7 +515,10 @@ const Binder = () => {
       {/* Add Cards Modal */}
       <AddCardsModal
         isOpen={isAddCardsModalOpen}
-        onClose={() => setIsAddCardsModalOpen(false)}
+        onClose={() => {
+          setIsAddCardsModalOpen(false);
+          setTargetSlot(null); // Clear the target slot when modal closes
+        }}
         binderId={binderId}
         onCardsAddedLocally={handleCardsAddedLocally}
         currentPage={currentPage}
@@ -520,6 +533,7 @@ const Binder = () => {
         onChangeGridSize={handleGridSizeChange}
         canAddPages={canAddPage}
         maxPages={maxPages}
+        targetSlot={targetSlot}
       />
     </>
   );

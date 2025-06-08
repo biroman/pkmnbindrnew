@@ -117,9 +117,9 @@ const CollectionManagementSection = ({
               <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                 Missing cards ({missingCards.length}):
               </div>
-              {missingCards.map((cardNumber) => (
+              {missingCards.map((cardNumber, index) => (
                 <div
-                  key={cardNumber}
+                  key={cardNumber || `missing-card-${index}`}
                   className="flex items-center justify-between bg-white dark:bg-gray-800 rounded px-2 py-1 text-sm"
                 >
                   <span className="text-gray-700 dark:text-gray-300">

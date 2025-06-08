@@ -1,4 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../contexts/AuthContext";
+import { getAllCardsInBinder } from "../services/firestore";
 import {
   getLocalBinderState,
   initializeLocalBinderState,
@@ -8,74 +11,85 @@ import {
   moveCardsInLocalBinder,
   addCardsToLocalBinder,
   needsSync,
+  saveLocalBinderState,
 } from "../utils/localBinderStorage";
-import {
-  processCardsWithReverseHolos,
-  removeReverseHolos,
-} from "../utils/reverseHoloProcessor";
 
 /**
  * Hook to manage local binder state as source of truth
- * No more overlay - local storage IS the current state
- * Now includes reverse holo processing
+ * Simplified approach: Local storage contains ALL cards, including reverse holos
+ * No more complex processing - what's in local storage IS what's displayed
  */
 export const useLocalCardState = (
   firebaseCards = [],
   binderId,
   preferences = {}
 ) => {
+  const { currentUser } = useAuth();
   const [localCards, setLocalCards] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Check if local storage is empty and we need to fetch all cards from Firebase
+  const localState = getLocalBinderState(binderId);
+  const isLocalEmpty =
+    !localState || !localState.cards || localState.cards.length === 0;
+  const needsAllCards = Boolean(isLocalEmpty && binderId && currentUser?.uid);
+
+  // Fetch ALL cards from Firebase if local storage is empty (incognito scenario)
+  const { data: allFirebaseCardsResult } = useQuery({
+    queryKey: ["allBinderCards", binderId, currentUser?.uid],
+    queryFn: async () => {
+      console.log("🔥 FETCHING ALL CARDS for initialization:", binderId);
+      return getAllCardsInBinder(currentUser.uid, binderId);
+    },
+    enabled: needsAllCards,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+
+  // Use all cards from Firebase if available, otherwise use visible cards
+  const cardsForInitialization =
+    needsAllCards && allFirebaseCardsResult?.success
+      ? allFirebaseCardsResult.data || []
+      : firebaseCards;
 
   // Initialize local state when Firebase data loads for the first time
   useEffect(() => {
     if (!binderId) return;
 
-    // Initialize from Firebase data if needed
-    const localState = initializeLocalBinderState(
+    console.log("Initializing local state with cards:", {
       binderId,
-      firebaseCards,
-      preferences
-    );
+      cardsCount: cardsForInitialization.length,
+      isLocalEmpty,
+      needsAllCards,
+      source: needsAllCards ? "getAllCardsInBinder" : "useBinderState",
+    });
 
-    // Get raw cards from local storage (without reverse holos)
-    const rawCards = localState.cards || [];
+    // Initialize from Firebase data if needed
+    // Pass the full preferences object which includes pageCount, binderName, etc.
+    initializeLocalBinderState(binderId, cardsForInitialization, preferences);
 
-    // Process cards with reverse holo logic if enabled
-    const processedCards = processCardsWithReverseHolos(
-      rawCards,
-      preferences.showReverseHolos,
-      preferences.gridSize || "3x3"
-    );
-
-    // Set local cards from processed result
-    setLocalCards(processedCards);
+    // Load cards from local storage
+    const cards = getAllLocalCards(binderId);
+    setLocalCards(cards);
   }, [
     binderId,
-    firebaseCards.length,
+    cardsForInitialization.length,
     preferences.showReverseHolos,
-    preferences.gridSize,
-  ]); // Include reverse holo preferences
+    preferences.pageCount,
+    preferences.updatedAt,
+    preferences.lastModified,
+  ]);
 
   // Function to refresh local cards from local storage
   const refreshLocalCards = useCallback(() => {
     if (!binderId) return;
 
     console.log("Refreshing local cards for binderId:", binderId);
-    const rawCards = getAllLocalCards(binderId);
-    console.log("Got raw cards from local storage:", rawCards.length);
+    const cards = getAllLocalCards(binderId);
+    console.log("Got cards from local storage:", cards.length);
 
-    // Process cards with reverse holo logic if enabled
-    const processedCards = processCardsWithReverseHolos(
-      rawCards,
-      preferences.showReverseHolos,
-      preferences.gridSize || "3x3"
-    );
-
-    console.log("Processed cards with reverse holos:", processedCards.length);
-    setLocalCards(processedCards);
+    setLocalCards(cards);
     setRefreshTrigger((prev) => prev + 1);
-  }, [binderId, preferences.showReverseHolos, preferences.gridSize]);
+  }, [binderId]);
 
   // Listen for storage events to update when local storage changes
   useEffect(() => {
@@ -96,21 +110,7 @@ export const useLocalCardState = (
 
       if (event.detail?.binderId === binderId) {
         console.log("Event matches binderId, refreshing local cards...");
-
-        // Force immediate refresh for revert events
-        if (event.detail?.type === "revert") {
-          console.log("Revert event detected, forcing immediate state update");
-
-          // Get fresh data immediately
-          const freshCards = getAllLocalCards(binderId);
-          console.log("Setting fresh cards from revert:", freshCards.length);
-          setLocalCards(freshCards);
-          setRefreshTrigger((prev) => prev + 1);
-        }
-
         refreshLocalCards();
-      } else {
-        console.log("Event binderId does not match, ignoring");
       }
     };
 
@@ -123,74 +123,184 @@ export const useLocalCardState = (
     };
   }, [binderId, refreshLocalCards]);
 
-  // Listen for preference changes to reprocess cards
+  // Handle reverse holo toggle - directly modify local storage
   useEffect(() => {
-    if (binderId) {
-      refreshLocalCards();
-    }
-  }, [preferences.showReverseHolos, preferences.gridSize, refreshLocalCards]);
+    if (!binderId) return;
 
-  // Get cards for a specific page (processed with reverse holos)
+    const toggleReverseHolos = () => {
+      const localState = getLocalBinderState(binderId);
+      if (!localState) return;
+
+      const showReverseHolos = preferences.showReverseHolos;
+      const currentCards = localState.cards || [];
+
+      if (showReverseHolos) {
+        // Check if we already have reverse holos (avoid double processing)
+        const hasReverseHolos = currentCards.some(
+          (card) => card.isReverseHolo || card.id.includes("_reverse")
+        );
+
+        if (hasReverseHolos) {
+          console.log("Reverse holos already present, skipping processing");
+          return;
+        }
+
+        console.log("Adding reverse holos using clean rebuild approach");
+
+        // Step 1: Gather all cards from entire binder into single ordered list
+        const allOriginalCards = currentCards
+          .filter(
+            (card) => !card.isReverseHolo && !card.id.includes("_reverse")
+          )
+          .sort((a, b) => {
+            if (a.pageNumber !== b.pageNumber) {
+              return a.pageNumber - b.pageNumber;
+            }
+            return a.slotInPage - b.slotInPage;
+          });
+
+        console.log(
+          `Step 1: Gathered ${allOriginalCards.length} original cards`
+        );
+
+        // Step 2: Create new expanded list with reverse holos
+        const expandedList = [];
+        for (const card of allOriginalCards) {
+          // Store original position for restoration later
+          const cardWithOriginalPos = {
+            ...card,
+            _originalPosition: {
+              pageNumber: card.pageNumber,
+              slotInPage: card.slotInPage,
+              overallSlotNumber: card.overallSlotNumber,
+            },
+          };
+
+          // Add the original card
+          expandedList.push(cardWithOriginalPos);
+
+          // If eligible for reverse holo, add it right after
+          if (isEligibleForReverseHolo(card)) {
+            const reverseCard = {
+              ...card,
+              id: `${card.id}_reverse`,
+              isReverseHolo: true,
+            };
+
+            // Ensure cardData has reverse holo flag
+            if (reverseCard.cardData) {
+              reverseCard.cardData = {
+                ...reverseCard.cardData,
+                isReverseHolo: true,
+              };
+            }
+
+            expandedList.push(reverseCard);
+          }
+        }
+
+        console.log(
+          `Step 2: Created expanded list with ${expandedList.length} cards`
+        );
+
+        // Step 3: Wipe pages clean and Step 4: Pour back into pages and slots
+        const { totalSlots } = parseGridSize(preferences.gridSize || "3x3");
+        const finalCards = [];
+        let currentSlot = 1;
+        let currentPage = 1;
+
+        for (const card of expandedList) {
+          const repositionedCard = {
+            ...card,
+            pageNumber: currentPage,
+            slotInPage: currentSlot,
+            overallSlotNumber: (currentPage - 1) * totalSlots + currentSlot,
+          };
+
+          finalCards.push(repositionedCard);
+
+          // Move to next slot
+          currentSlot++;
+          if (currentSlot > totalSlots) {
+            currentSlot = 1;
+            currentPage++;
+          }
+        }
+
+        console.log(
+          `Step 3 & 4: Repositioned all cards across ${currentPage} pages`
+        );
+
+        // Save the new card arrangement
+        saveLocalBinderState(binderId, {
+          ...localState,
+          cards: finalCards,
+        });
+      } else {
+        // Remove reverse holos and restore original positions
+        const originalCards = currentCards.filter(
+          (card) => !card.isReverseHolo && !card.id.includes("_reverse")
+        );
+
+        // Restore cards to their original positions if stored, otherwise keep current position
+        const restoredCards = originalCards.map((card) => {
+          if (card._originalPosition) {
+            // Restore to original position
+            const { _originalPosition, ...cardWithoutOriginalPosition } = card;
+            return {
+              ...cardWithoutOriginalPosition,
+              pageNumber: _originalPosition.pageNumber,
+              slotInPage: _originalPosition.slotInPage,
+              overallSlotNumber: _originalPosition.overallSlotNumber,
+            };
+          } else {
+            // Keep current position if no original position stored
+            return card;
+          }
+        });
+
+        // Save the restored cards
+        saveLocalBinderState(binderId, {
+          ...localState,
+          cards: restoredCards,
+        });
+      }
+
+      // Refresh the UI
+      refreshLocalCards();
+    };
+
+    toggleReverseHolos();
+  }, [
+    preferences.showReverseHolos,
+    preferences.gridSize,
+    binderId,
+    refreshLocalCards,
+  ]);
+
+  // Get cards for a specific page
   const getCardsForPage = useCallback(
     (pageNumber) => {
-      if (!binderId) return [];
-
-      console.log(
-        `getCardsForPage called for binderId: ${binderId}, pageNumber: ${pageNumber}`
-      );
-
-      // Get ALL local cards first (not just for this page)
-      const allRawCards = getAllLocalCards(binderId);
-
-      // Process ALL cards with reverse holos if enabled
-      const processedCards = processCardsWithReverseHolos(
-        allRawCards,
-        preferences.showReverseHolos,
-        preferences.gridSize || "3x3"
-      );
-
-      // Filter for the specific page from processed cards
-      const pageCards = processedCards.filter(
-        (card) => card.pageNumber === pageNumber
-      );
-
-      return pageCards;
+      return getLocalCardsForPage(binderId, pageNumber);
     },
-    [
-      binderId,
-      refreshTrigger,
-      preferences.showReverseHolos,
-      preferences.gridSize,
-    ] // Include refreshTrigger to ensure updates
+    [binderId]
   );
 
-  // Check if a card is in a specific slot (processed cards)
+  // Get card in a specific slot
   const getCardInSlot = useCallback(
     (pageNumber, slotInPage) => {
-      const cards = getCardsForPage(pageNumber);
-      return cards.find((card) => card.slotInPage === slotInPage) || null;
+      return localCards.find(
+        (card) =>
+          card.pageNumber === pageNumber && card.slotInPage === slotInPage
+      );
     },
-    [getCardsForPage]
+    [localCards]
   );
 
   // Move a single card immediately in local storage
-  // Note: When moving reverse holo cards, we need to handle them specially
   const moveCard = useCallback(
     (cardId, newPosition) => {
-      // If moving a reverse holo card, we need to remove it from processing
-      // and just work with the original card
-      let actualCardId = cardId;
-      if (cardId.includes("_reverse")) {
-        // For reverse holo cards, we don't allow individual moves
-        // They should move with their original card
-        console.warn("Cannot move reverse holo cards individually");
-        return {
-          success: false,
-          error: "Cannot move reverse holo cards individually",
-        };
-      }
-
-      const result = moveCardInLocalBinder(binderId, actualCardId, newPosition);
+      const result = moveCardInLocalBinder(binderId, cardId, newPosition);
       if (result.success) {
         refreshLocalCards();
 
@@ -206,15 +316,10 @@ export const useLocalCardState = (
     [binderId, refreshLocalCards]
   );
 
-  // Move multiple cards immediately in local storage (for page reordering)
+  // Move multiple cards immediately in local storage
   const moveCards = useCallback(
     (cardUpdates) => {
-      // Filter out reverse holo cards from updates since they're automatically generated
-      const filteredUpdates = cardUpdates.filter(
-        (update) => !update.cardId.includes("_reverse")
-      );
-
-      const result = moveCardsInLocalBinder(binderId, filteredUpdates);
+      const result = moveCardsInLocalBinder(binderId, cardUpdates);
       if (result.success) {
         refreshLocalCards();
 
@@ -237,11 +342,7 @@ export const useLocalCardState = (
   // Add cards immediately to local storage
   const addCards = useCallback(
     (cardsToAdd) => {
-      // Remove any reverse holo variants from cards being added
-      // since they'll be generated automatically
-      const cleanedCards = removeReverseHolos(cardsToAdd);
-
-      const result = addCardsToLocalBinder(binderId, cleanedCards);
+      const result = addCardsToLocalBinder(binderId, cardsToAdd);
       if (result.success) {
         refreshLocalCards();
 
@@ -267,7 +368,7 @@ export const useLocalCardState = (
   }, [binderId]);
 
   return {
-    // Data - now includes processed cards with reverse holos
+    // Data
     localCards,
 
     // Functions
@@ -281,5 +382,26 @@ export const useLocalCardState = (
 
     // State indicators
     needsSync: hasUnsyncedChanges(),
+  };
+};
+
+// Helper function to check if card is eligible for reverse holo
+const isEligibleForReverseHolo = (card) => {
+  if (!card) return false;
+
+  const rarity = card.cardData?.rarity || card.rarity;
+  if (!rarity) return false;
+
+  const REVERSE_HOLO_RARITIES = ["Common", "Uncommon", "Rare"];
+  return REVERSE_HOLO_RARITIES.includes(rarity);
+};
+
+// Helper function to parse grid size
+const parseGridSize = (gridSize) => {
+  const [cols, rows] = gridSize.split("x").map(Number);
+  return {
+    cols,
+    rows,
+    totalSlots: cols * rows,
   };
 };

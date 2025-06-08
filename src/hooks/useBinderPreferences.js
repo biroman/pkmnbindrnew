@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { getBinder, updateBinder } from "../services/firestore"; // Fixed import
 import { useCacheInvalidation } from "./useCacheInvalidation";
+import { updateLocalBinderPreferences } from "../utils/localBinderStorage";
 
 /**
  * Hook to get and manage preferences for a specific binder.
@@ -51,8 +52,9 @@ export const useBinderPreferences = (binderId) => {
       // Clear any previous save errors on successful save
       setSaveError(null);
 
-      // Use centralized cache invalidation for comprehensive updates
-      invalidateAllBinderData(variables.userId, variables.binderId);
+      // Don't invalidate cache immediately - the optimistic update already has the correct data
+      // and immediate invalidation causes race conditions with Firebase propagation
+      // The cache will naturally refresh when staleTime expires (2 minutes)
 
       setIsDirty(false); // Mark as clean after successful save
     },
@@ -90,10 +92,15 @@ export const useBinderPreferences = (binderId) => {
     missingCards: [],
     sortBy: "slot",
     sortDirection: "asc",
+    // Include timestamp fields for local storage comparison (undefined by default)
+    updatedAt: undefined,
+    lastModified: undefined,
+    createdAt: undefined,
     // Add other relevant fields that are part of the binder document but managed here
   };
 
   // Extract preferences from the fetched binder document or use defaults
+
   const savedPreferences = binderDocument
     ? {
         binderName: binderDocument.binderName || defaultPreferences.binderName,
@@ -110,6 +117,17 @@ export const useBinderPreferences = (binderId) => {
         sortBy: binderDocument.sortBy || defaultPreferences.sortBy,
         sortDirection:
           binderDocument.sortDirection || defaultPreferences.sortDirection,
+        // Include timestamp fields for local storage comparison
+        // Convert Firestore Timestamps to ISO strings for comparison
+        updatedAt: binderDocument.updatedAt?.toDate
+          ? binderDocument.updatedAt.toDate().toISOString()
+          : binderDocument.updatedAt,
+        lastModified: binderDocument.lastModified?.toDate
+          ? binderDocument.lastModified.toDate().toISOString()
+          : binderDocument.lastModified,
+        createdAt: binderDocument.createdAt?.toDate
+          ? binderDocument.createdAt.toDate().toISOString()
+          : binderDocument.createdAt,
         // Include other fields from binderDocument that are considered preferences
       }
     : defaultPreferences;
@@ -120,7 +138,22 @@ export const useBinderPreferences = (binderId) => {
   useEffect(() => {
     setLocalPreferences(savedPreferences);
     setIsDirty(false); // Reset dirty state when fetched data changes
-  }, [binderDocument]); // Deep comparison might be needed if savedPreferences is complex or use JSON.stringify if simple enough
+  }, [binderDocument]);
+
+  // Update local storage whenever preferences change
+  useEffect(() => {
+    if (
+      binderId &&
+      localPreferences &&
+      Object.keys(localPreferences).length > 0
+    ) {
+      console.log(
+        "Updating local storage with new preferences:",
+        localPreferences
+      );
+      updateLocalBinderPreferences(binderId, localPreferences);
+    }
+  }, [binderId, localPreferences]); // Deep comparison might be needed if savedPreferences is complex or use JSON.stringify if simple enough
 
   // Guest user handling (simplified, as preferences are now binder-specific)
   if (!currentUser) {

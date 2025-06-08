@@ -138,6 +138,146 @@ export const initializeLocalBinderState = (
     return updatedState;
   }
 
+  // Check if we have Firebase binder preferences with timestamp for comparison
+  let firebaseLastModified = preferences.updatedAt || preferences.lastModified;
+  const localLastModified = localState.lastModified;
+
+  // IMPORTANT: If we have Firebase cards but no timestamp in preferences,
+  // try to extract timestamp from the Firebase cards themselves
+  if (!firebaseLastModified && firebaseCards.length > 0) {
+    // Look for timestamp on individual cards (they might have addedAt/updatedAt)
+    const cardWithTimestamp = firebaseCards.find(
+      (card) => card.addedAt || card.updatedAt || card.createdAt
+    );
+
+    if (cardWithTimestamp) {
+      let rawTimestamp =
+        cardWithTimestamp.addedAt ||
+        cardWithTimestamp.updatedAt ||
+        cardWithTimestamp.createdAt;
+
+      // Convert Firestore Timestamp to ISO string if needed
+      if (rawTimestamp?.toDate) {
+        firebaseLastModified = rawTimestamp.toDate().toISOString();
+      } else {
+        firebaseLastModified = rawTimestamp;
+      }
+
+      console.log("🕒 Found timestamp on Firebase card:", firebaseLastModified);
+    }
+  }
+
+  // Debug the timestamp comparison in detail with error handling
+  if (firebaseLastModified && localLastModified) {
+    try {
+      // Handle potential Firestore Timestamp objects
+      let firebaseTimeValue = firebaseLastModified;
+      let localTimeValue = localLastModified;
+
+      // Convert Firestore Timestamps to ISO strings
+      if (firebaseLastModified?.toDate) {
+        firebaseTimeValue = firebaseLastModified.toDate().toISOString();
+      }
+      if (localLastModified?.toDate) {
+        localTimeValue = localLastModified.toDate().toISOString();
+      }
+
+      const firebaseDate = new Date(firebaseTimeValue);
+      const localDate = new Date(localTimeValue);
+
+      // Check if dates are valid
+      if (isNaN(firebaseDate.getTime()) || isNaN(localDate.getTime())) {
+        console.error("❌ INVALID TIMESTAMP FORMAT:", {
+          firebaseRaw: firebaseLastModified,
+          localRaw: localLastModified,
+          firebaseProcessed: firebaseTimeValue,
+          localProcessed: localTimeValue,
+          firebaseValid: !isNaN(firebaseDate.getTime()),
+          localValid: !isNaN(localDate.getTime()),
+        });
+        return localState; // Fall back to existing local state
+      }
+
+      const isFirebaseNewer = firebaseDate > localDate;
+    } catch (error) {
+      console.error("❌ TIMESTAMP COMPARISON ERROR:", error, {
+        firebaseLastModified,
+        localLastModified,
+      });
+      return localState; // Fall back to existing local state
+    }
+  }
+
+  // CRITICAL: Check timestamp comparison FIRST before considering local changes
+  // If we have both timestamps and Firebase is newer, use Firebase data immediately
+  const shouldUseFirebaseData = (() => {
+    if (!firebaseLastModified || !localLastModified) return false;
+
+    try {
+      // Handle potential Firestore Timestamp objects
+      let firebaseTimeValue = firebaseLastModified;
+      let localTimeValue = localLastModified;
+
+      // Convert Firestore Timestamps to ISO strings
+      if (firebaseLastModified?.toDate) {
+        firebaseTimeValue = firebaseLastModified.toDate().toISOString();
+      }
+      if (localLastModified?.toDate) {
+        localTimeValue = localLastModified.toDate().toISOString();
+      }
+
+      const firebaseDate = new Date(firebaseTimeValue);
+      const localDate = new Date(localTimeValue);
+
+      // Check if dates are valid
+      if (isNaN(firebaseDate.getTime()) || isNaN(localDate.getTime())) {
+        console.error("❌ INVALID DATES IN COMPARISON:", {
+          firebaseTimeValue,
+          localTimeValue,
+        });
+        return false;
+      }
+
+      return firebaseDate > localDate;
+    } catch (error) {
+      console.error("❌ ERROR IN TIMESTAMP COMPARISON:", error);
+      return false;
+    }
+  })();
+
+  if (shouldUseFirebaseData) {
+    console.log("🔄 Firebase data is newer than local, using Firebase data");
+    console.log("📝 OVERRIDING LOCAL DATA:", {
+      localCardCount: localState.cards?.length || 0,
+      firebaseCardCount: firebaseCards.length,
+      firebaseTimestamp: firebaseLastModified,
+      localTimestamp: localLastModified,
+    });
+
+    const updatedState = {
+      version: STORAGE_VERSION,
+      binderId,
+      cards: firebaseCards,
+      preferences: { ...(localState?.preferences || {}), ...preferences },
+      lastModified: firebaseLastModified,
+    };
+
+    // Save to local storage
+    localStorage.setItem(
+      getBinderStorageKey(binderId),
+      JSON.stringify(updatedState)
+    );
+
+    // Mark as synced since this is fresh Firebase data
+    setSyncStatus(binderId, {
+      needsSync: false,
+      lastSynced: firebaseLastModified,
+    });
+
+    console.log("✅ LOCAL STORAGE UPDATED WITH FIREBASE DATA");
+    return updatedState;
+  }
+
   // If local has changes, we need to be smarter about merging
   if (hasLocalChanges && hasFirebaseCards) {
     console.log(
@@ -225,28 +365,65 @@ export const initializeLocalBinderState = (
     return updatedState;
   }
 
-  // If local has no unsaved changes, update with Firebase data
+  // If local has no unsaved changes, merge with Firebase data instead of replacing
   if (!hasLocalChanges && hasFirebaseCards) {
-    console.log("No local changes detected, updating with fresh Firebase data");
+    console.log("No local changes detected, merging with Firebase data");
+
+    // Don't completely replace local data - merge instead to preserve any cards
+    // that might not be immediately available in Firebase (like recently synced reverse holos)
+
+    // Create maps for easier comparison
+    const firebaseCardMap = new Map();
+    firebaseCards.forEach((card) => {
+      const key = `${card.pageNumber}-${card.slotInPage}`;
+      firebaseCardMap.set(key, card);
+    });
+
+    const localCardMap = new Map();
+    if (localState.cards) {
+      localState.cards.forEach((card) => {
+        const key = `${card.pageNumber}-${card.slotInPage}`;
+        localCardMap.set(key, card);
+      });
+    }
+
+    // Merge: Firebase cards take precedence, but keep local cards if Firebase doesn't have them
+    const mergedCards = [...firebaseCards];
+
+    // Add any local cards that aren't in Firebase (e.g., recently synced reverse holos)
+    if (localState.cards) {
+      localState.cards.forEach((localCard) => {
+        const key = `${localCard.pageNumber}-${localCard.slotInPage}`;
+        if (!firebaseCardMap.has(key)) {
+          console.log(
+            `Preserving local card not found in Firebase: ${
+              localCard.cardData?.name || localCard.id
+            } at ${key}`
+          );
+          mergedCards.push(localCard);
+        }
+      });
+    }
 
     // Preserve existing local preferences and merge with Firebase preferences
-    // This prevents preferences from being reset during sync cycles
     const preservedPreferences = {
       ...(localState?.preferences || {}), // Existing local preferences
       ...preferences, // Firebase preferences (may be empty during reinitialization)
     };
 
-    console.log("Preference preservation during reinitialization:", {
+    console.log("Smart merge during reinitialization:", {
+      firebaseCardsCount: firebaseCards.length,
+      localCardsCount: localState.cards?.length || 0,
+      mergedCardsCount: mergedCards.length,
       existingLocalPrefs: localState?.preferences || {},
       incomingFirebasePrefs: preferences,
       preservedPreferences,
-      showReverseHolosPreserved: preservedPreferences.showReverseHolos,
     });
 
     const updatedState = {
       version: STORAGE_VERSION,
       binderId,
-      cards: firebaseCards,
+      cards: mergedCards,
       preferences: preservedPreferences,
       lastModified: new Date().toISOString(),
     };

@@ -39,7 +39,7 @@ export const useCacheInvalidation = () => {
   };
 
   const invalidateSpecificBinder = (userId, binderId) => {
-    queryClient.invalidateQueries({ queryKey: ["binder", userId, binderId] });
+    queryClient.invalidateQueries({ queryKey: ["binder", binderId, userId] });
   };
 
   // ===== COLLECTION-RELATED INVALIDATIONS =====

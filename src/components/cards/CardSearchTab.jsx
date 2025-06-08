@@ -485,8 +485,8 @@ const CardSearchTab = ({
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
             >
               <option value="">All Types</option>
-              {types.map((type) => (
-                <option key={type} value={type}>
+              {types.map((type, index) => (
+                <option key={type || `type-${index}`} value={type}>
                   {type}
                 </option>
               ))}
@@ -506,8 +506,8 @@ const CardSearchTab = ({
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
             >
               <option value="">All Rarities</option>
-              {rarities.map((rarity) => (
-                <option key={rarity} value={rarity}>
+              {rarities.map((rarity, index) => (
+                <option key={rarity || `rarity-${index}`} value={rarity}>
                   {rarity}
                 </option>
               ))}

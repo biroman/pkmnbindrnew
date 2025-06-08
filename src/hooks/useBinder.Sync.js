@@ -69,11 +69,29 @@ export const useBinderSync = (binderId) => {
       if (localState.cards && localState.cards.length > 0) {
         console.log(`Syncing ${localState.cards.length} cards...`);
 
+        // Use all cards for syncing (including reverse holos)
+        const syncableCards = localState.cards;
+
+        console.log(
+          `Syncing all ${syncableCards.length} cards (including reverse holos)`
+        );
+
         // Separate new cards from existing cards based on ID patterns
         // New cards have complex IDs like "sv10-13_1749239586254_8w1jkho1x"
         // Existing cards have Firebase document IDs (simple alphanumeric)
 
-        localState.cards.forEach((card) => {
+        console.log("🔍 Analyzing card IDs for sync classification:");
+        syncableCards.forEach((card) => {
+          console.log(
+            `Card ID: "${
+              card.id
+            }" | Pattern check: includes("_")=${card.id.includes(
+              "_"
+            )} | timestamp match=${!!card.id.match(/_\d{13}_/)}`
+          );
+        });
+
+        syncableCards.forEach((card) => {
           // Check if this looks like a new card (has underscore and timestamp)
           if (card.id.includes("_") && card.id.match(/_\d{13}_/)) {
             // This is a new card that needs to be added to Firebase
@@ -104,6 +122,9 @@ export const useBinderSync = (binderId) => {
 
               // Include value with default
               value: originalCard.value || 0,
+
+              // Include reverse holo flag if present
+              ...(card.isReverseHolo && { isReverseHolo: true }),
             };
 
             // Add optional fields only if they exist and are not undefined

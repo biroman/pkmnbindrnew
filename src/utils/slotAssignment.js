@@ -2,6 +2,47 @@ import { parseGridSize } from "./gridUtils";
 import { getAllLocalCards } from "./localBinderStorage";
 
 /**
+ * Simple function to calculate available slots count
+ * @param {string} binderId - The binder ID
+ * @param {string} gridSize - Grid size (e.g., "4x4")
+ * @param {Array} savedCards - Already saved cards from Firebase
+ * @param {number} totalPages - Total pages in the binder
+ * @returns {number} Number of available slots
+ */
+export const getAvailableSlotsCount = (
+  binderId,
+  gridSize,
+  savedCards = [],
+  totalPages = 1
+) => {
+  const { totalSlots: slotsPerPage } = parseGridSize(gridSize);
+  const localCards = getAllLocalCards(binderId);
+
+  // Calculate actual max page number based on book-style layout
+  const actualMaxPage = totalPages === 1 ? 1 : 1 + (totalPages - 1) * 2;
+  const totalAvailableSlots = actualMaxPage * slotsPerPage;
+
+  // Create a set of all occupied positions to avoid double-counting
+  const occupiedSlots = new Set();
+
+  // Add saved cards
+  savedCards.forEach((card) => {
+    if (card.pageNumber && card.slotInPage) {
+      occupiedSlots.add(`${card.pageNumber}-${card.slotInPage}`);
+    }
+  });
+
+  // Add local cards
+  localCards.forEach((card) => {
+    if (card.pageNumber && card.slotInPage) {
+      occupiedSlots.add(`${card.pageNumber}-${card.slotInPage}`);
+    }
+  });
+
+  return Math.max(0, totalAvailableSlots - occupiedSlots.size);
+};
+
+/**
  * Utility functions for managing card slot assignments in binders
  */
 
@@ -13,6 +54,7 @@ import { getAllLocalCards } from "./localBinderStorage";
  * @param {string} gridSize - Grid size (e.g., "3x3")
  * @param {Array} savedCards - Already saved cards from Firebase
  * @param {number} totalPages - Total pages in the binder
+ * @param {number} startFromSlot - Optional: start searching from this slot number
  * @returns {Array} Array of slot assignments { pageNumber, slotInPage }
  */
 export const getNextAvailableSlots = (
@@ -21,25 +63,31 @@ export const getNextAvailableSlots = (
   currentPage,
   gridSize,
   savedCards = [],
-  totalPages = 1
+  totalPages = 1,
+  startFromSlot = null
 ) => {
   const { totalSlots: slotsPerPage } = parseGridSize(gridSize);
 
-  // Get all local cards (this includes both saved and pending cards in the new system)
+  // Get all cards (local + saved) to check what's occupied
   const localCards = getAllLocalCards(binderId);
+  const allCards = [...savedCards, ...localCards];
 
-  // Create a set of occupied slots for fast lookup
+  // Simple calculation: if we just need to know if we have enough slots
+  // Calculate actual max page number based on book-style layout
+  const actualMaxPage = totalPages === 1 ? 1 : 1 + (totalPages - 1) * 2;
+  const totalAvailableSlots = actualMaxPage * slotsPerPage;
+  const occupiedSlotsCount = allCards.length;
+  const availableSlotsCount = totalAvailableSlots - occupiedSlotsCount;
+
+  // If we just need the count (for SlotLimitModal), return early
+  if (availableSlotsCount < count) {
+    // Return empty array to indicate not enough slots
+    return [];
+  }
+
+  // If we need specific slot assignments, find them
   const occupiedSlots = new Set();
-
-  // Mark saved card slots as occupied (from Firebase)
-  savedCards.forEach((card) => {
-    if (card.pageNumber && card.slotInPage) {
-      occupiedSlots.add(`${card.pageNumber}-${card.slotInPage}`);
-    }
-  });
-
-  // Mark local card slots as occupied (from local storage)
-  localCards.forEach((card) => {
+  allCards.forEach((card) => {
     if (card.pageNumber && card.slotInPage) {
       occupiedSlots.add(`${card.pageNumber}-${card.slotInPage}`);
     }
@@ -47,11 +95,19 @@ export const getNextAvailableSlots = (
 
   const availableSlots = [];
 
-  // Start from current page and work forward
-  let page = currentPage;
-  let slot = 1;
+  // Determine starting position
+  let page, slot;
+  if (startFromSlot) {
+    const startPosition = getPageAndSlotFromSlotNumber(startFromSlot, gridSize);
+    page = startPosition.pageNumber;
+    slot = startPosition.slotInPage;
+  } else {
+    page = currentPage;
+    slot = 1;
+  }
 
-  while (availableSlots.length < count && page <= totalPages) {
+  // Find specific available slots
+  while (availableSlots.length < count && page <= actualMaxPage) {
     const slotKey = `${page}-${slot}`;
 
     if (!occupiedSlots.has(slotKey)) {
